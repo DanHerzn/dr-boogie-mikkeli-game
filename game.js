@@ -163,6 +163,10 @@ function create() {
     const screenWidth = this.scale.width;
     const screenHeight = this.scale.height;
     
+    // Check if we're in fullscreen mode
+    const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement || 
+                       document.mozFullScreenElement || document.msFullscreenElement;
+    
     // Calculate scale to ensure map fits properly in all orientations
     // No UI space reservation - UI will overlay on the map
     const scaleX = screenWidth / mapSprite.width;
@@ -180,7 +184,11 @@ function create() {
                      ('ontouchstart' in window) || 
                      (navigator.maxTouchPoints > 0);
     
-    if (isMobile) {
+    if (isFullscreen) {
+        // In fullscreen mode, maximize map usage (98% of screen)
+        scale = scale * 0.98;
+        console.log('Fullscreen mode: using 98% scale');
+    } else if (isMobile) {
         if (isLandscape) {
             // In landscape mode, use more of the available space for better map visibility
             scale = Math.min(scaleX * 0.95, scaleY * 0.90); // Use 95% of width, 90% of height
@@ -464,6 +472,11 @@ function spawnDisaster() {
     const disaster = disasters.create(x, y, type);
     disaster.disasterType = type;
     
+    // Store original map coordinates for fullscreen recalculation
+    const gameScene = game.scene.getScene('default');
+    disaster.originalX = (x - gameScene.mapOffsetX) / gameScene.mapScale;
+    disaster.originalY = (y - gameScene.mapOffsetY) / gameScene.mapScale;
+    
     // Store original velocity and set current velocity
     disaster.originalVelocityX = velocityX;
     disaster.originalVelocityY = velocityY;
@@ -476,10 +489,10 @@ function spawnDisaster() {
     }
     
     // Scale disaster images proportionally to map scale, smaller in portrait mode
-    const gameScene = game.scene.getScene('default');
-    const isPortrait = gameScene.scale.height > gameScene.scale.width;
+    const sceneForScale = game.scene.getScene('default');
+    const isPortrait = sceneForScale.scale.height > sceneForScale.scale.width;
     const portraitReduction = isPortrait ? 0.7 : 1.0; // 30% smaller in portrait
-    const scaleMultiplier = Math.max(0.5, gameScene.mapScale) * portraitReduction;
+    const scaleMultiplier = Math.max(0.5, sceneForScale.mapScale) * portraitReduction;
     
     if (type === 'meteor') {
         disaster.setScale(0.2 * scaleMultiplier);
@@ -722,11 +735,16 @@ function spawnFreezePowerUp() {
     const y = Phaser.Math.Between(mapTop, mapBottom);
     
     const freezePowerUp = powerUps.create(x, y, 'freeze');
+    
+    // Store original map coordinates for fullscreen recalculation
+    const freezeScene = game.scene.getScene('default');
+    freezePowerUp.originalX = (x - freezeScene.mapOffsetX) / freezeScene.mapScale;
+    freezePowerUp.originalY = (y - freezeScene.mapOffsetY) / freezeScene.mapScale;
+    
     // Scale power-up proportionally to map scale, smaller in portrait mode
-    const gameScene = game.scene.getScene('default');
-    const isPortrait = gameScene.scale.height > gameScene.scale.width;
+    const isPortrait = freezeScene.scale.height > freezeScene.scale.width;
     const portraitReduction = isPortrait ? 0.7 : 1.0; // 30% smaller in portrait
-    const powerUpScale = 0.12 * Math.max(0.6, gameScene.mapScale) * portraitReduction;
+    const powerUpScale = 0.12 * Math.max(0.6, freezeScene.mapScale) * portraitReduction;
     freezePowerUp.setScale(powerUpScale);
     freezePowerUp.powerType = 'freeze';
     freezePowerUp.spawnTime = Date.now();
@@ -768,11 +786,16 @@ function spawnShieldPowerUp() {
         targetLandmark.y + offsetY, 
         'shield'
     );
+    
+    // Store original map coordinates for fullscreen recalculation
+    const shieldScene = game.scene.getScene('default');
+    shieldPowerUp.originalX = (shieldPowerUp.x - shieldScene.mapOffsetX) / shieldScene.mapScale;
+    shieldPowerUp.originalY = (shieldPowerUp.y - shieldScene.mapOffsetY) / shieldScene.mapScale;
+    
     // Scale shield power-up proportionally to map scale, smaller in portrait mode
-    const gameScene = game.scene.getScene('default');
-    const isPortrait = gameScene.scale.height > gameScene.scale.width;
+    const isPortrait = shieldScene.scale.height > shieldScene.scale.width;
     const portraitReduction = isPortrait ? 0.7 : 1.0; // 30% smaller in portrait
-    const shieldScale = 0.1 * Math.max(0.6, gameScene.mapScale) * portraitReduction;
+    const shieldScale = 0.1 * Math.max(0.6, shieldScene.mapScale) * portraitReduction;
     shieldPowerUp.setScale(shieldScale);
     shieldPowerUp.powerType = 'shield';
     shieldPowerUp.targetLandmark = targetLandmark;
@@ -892,22 +915,13 @@ function toggleFullscreen() {
             if (fullscreenPromise && fullscreenPromise.then) {
                 fullscreenPromise.then(() => {
                     console.log('Fullscreen entered successfully');
-                    // Lock orientation to landscape if possible
-                    if (screen.orientation && screen.orientation.lock) {
-                        screen.orientation.lock('landscape').catch((err) => {
-                            console.log('Orientation lock failed:', err);
-                        });
-                    }
+                    // Don't lock orientation - let user choose
+                    updateFullscreenButton();
                 }).catch((err) => {
                     console.error('Fullscreen failed:', err);
                 });
             } else {
-                // Lock orientation to landscape if possible
-                if (screen.orientation && screen.orientation.lock) {
-                    screen.orientation.lock('landscape').catch((err) => {
-                        console.log('Orientation lock failed:', err);
-                    });
-                }
+                updateFullscreenButton();
             }
         } else {
             // Exit fullscreen
@@ -923,10 +937,10 @@ function toggleFullscreen() {
                 document.msExitFullscreen();
             }
             
-            // Unlock orientation
-            if (screen.orientation && screen.orientation.unlock) {
-                screen.orientation.unlock();
-            }
+            // Update button after exiting
+            setTimeout(() => {
+                updateFullscreenButton();
+            }, 100);
         }
     } catch (error) {
         console.error('Fullscreen error:', error);
@@ -943,12 +957,160 @@ function updateFullscreenButton() {
         fullscreenBtn.title = isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen';
     }
     
-    // Resize game when fullscreen changes
+    // Resize game when fullscreen changes and recalculate map scale
     setTimeout(() => {
         if (game && game.scene && game.scene.scenes[0]) {
+            const gameScene = game.scene.scenes[0];
             game.scale.resize(window.innerWidth, window.innerHeight);
+            
+            // Force recalculation of map scale for fullscreen
+            if (gameScene.scene.isActive()) {
+                recalculateMapForFullscreen(gameScene);
+            }
         }
-    }, 100);
+    }, 150);
+}
+
+function recalculateMapForFullscreen(scene) {
+    try {
+        console.log('Recalculating map for fullscreen/orientation change');
+        
+        // Get the current fullscreen state
+        const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement || 
+                           document.mozFullScreenElement || document.msFullscreenElement;
+        
+        // Get current screen dimensions
+        const screenWidth = window.innerWidth;
+        const screenHeight = window.innerHeight;
+        
+        console.log(`Screen dimensions: ${screenWidth}x${screenHeight}, Fullscreen: ${isFullscreen}`);
+        
+        // Map original dimensions (adjust these based on your actual map size)
+        const mapWidth = 1200;  // Adjust to your map's actual width
+        const mapHeight = 800;  // Adjust to your map's actual height
+        
+        let scaleX = screenWidth / mapWidth;
+        let scaleY = screenHeight / mapHeight;
+        let scale;
+        
+        if (isFullscreen) {
+            // In fullscreen, use maximum possible scale while maintaining aspect ratio
+            scale = Math.min(scaleX, scaleY);
+            
+            // Use 98% of available space in fullscreen for maximum visibility
+            scale = scale * 0.98;
+            
+            console.log(`Fullscreen scale calculated: ${scale}`);
+        } else {
+            // Normal scaling logic
+            const isLandscape = screenWidth > screenHeight;
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                           ('ontouchstart' in window) || 
+                           (navigator.maxTouchPoints > 0);
+            
+            scale = Math.min(scaleX, scaleY);
+            
+            if (isMobile) {
+                if (isLandscape) {
+                    scale = Math.min(scaleX * 0.95, scaleY * 0.90);
+                    if (scale < 0.5) scale = 0.5;
+                    else if (scale > 1.0) scale = 1.0;
+                } else {
+                    if (scale < 0.4) scale = 0.4;
+                    else if (scale > 0.8) scale = 0.8;
+                }
+            } else {
+                if (scale < 0.5) scale = 0.5;
+                else if (scale > 1.2) scale = 1.2;
+            }
+        }
+        
+        // Update scene's map scale
+        scene.mapScale = scale;
+        
+        // Recalculate map position (center it)
+        const scaledMapWidth = mapWidth * scale;
+        const scaledMapHeight = mapHeight * scale;
+        
+        scene.mapOffsetX = (screenWidth - scaledMapWidth) / 2;
+        scene.mapOffsetY = (screenHeight - scaledMapHeight) / 2;
+        
+        console.log(`New map scale: ${scale}, offset: (${scene.mapOffsetX}, ${scene.mapOffsetY})`);
+        
+        // Update map sprite if it exists
+        if (scene.mapSprite) {
+            scene.mapSprite.setScale(scale);
+            scene.mapSprite.setPosition(scene.mapOffsetX + scaledMapWidth/2, scene.mapOffsetY + scaledMapHeight/2);
+        }
+        
+        // Update player scale and position if exists
+        if (player) {
+            const isPortrait = screenHeight > screenWidth;
+            const portraitReduction = isPortrait ? 0.5 : 1.0;
+            const playerScale = 0.15 * Math.max(0.6, scale) * portraitReduction;
+            player.setScale(playerScale);
+            player.body.setSize(player.width * 0.8, player.height * 0.8);
+        }
+        
+        // Update landmarks positions and scales
+        if (landmarks && landmarks.children && landmarks.children.entries) {
+            landmarks.children.entries.forEach((landmark, index) => {
+                if (landmark.landmarkData) {
+                    const screenX = scene.mapOffsetX + (landmark.landmarkData.x * scale);
+                    const screenY = scene.mapOffsetY + (landmark.landmarkData.y * scale);
+                    
+                    landmark.setPosition(screenX, screenY);
+                    
+                    // Update collision radius
+                    const landmarkRadius = Math.max(20, 40 * scale);
+                    landmark.body.setCircle(landmarkRadius);
+                    
+                    // Update dot overlay position
+                    if (landmark.dotOverlay) {
+                        landmark.dotOverlay.x = screenX;
+                        landmark.dotOverlay.y = screenY;
+                    }
+                }
+            });
+        }
+        
+        // Update disasters positions and scales
+        if (disasters && disasters.children && disasters.children.entries) {
+            disasters.children.entries.forEach((disaster) => {
+                if (disaster.originalX !== undefined && disaster.originalY !== undefined) {
+                    const screenX = scene.mapOffsetX + (disaster.originalX * scale);
+                    const screenY = scene.mapOffsetY + (disaster.originalY * scale);
+                    disaster.setPosition(screenX, screenY);
+                    
+                    const isPortrait = screenHeight > screenWidth;
+                    const portraitReduction = isPortrait ? 0.5 : 1.0;
+                    const disasterScale = 0.06 * Math.max(0.7, scale) * portraitReduction;
+                    disaster.setScale(disasterScale);
+                }
+            });
+        }
+        
+        // Update power-ups positions and scales
+        if (powerUps && powerUps.children && powerUps.children.entries) {
+            powerUps.children.entries.forEach((powerUp) => {
+                if (powerUp.originalX !== undefined && powerUp.originalY !== undefined) {
+                    const screenX = scene.mapOffsetX + (powerUp.originalX * scale);
+                    const screenY = scene.mapOffsetY + (powerUp.originalY * scale);
+                    powerUp.setPosition(screenX, screenY);
+                    
+                    const isPortrait = screenHeight > screenWidth;
+                    const portraitReduction = isPortrait ? 0.6 : 1.0;
+                    const powerUpScale = 0.08 * Math.max(0.7, scale) * portraitReduction;
+                    powerUp.setScale(powerUpScale);
+                }
+            });
+        }
+        
+        console.log('Map recalculation complete');
+        
+    } catch (error) {
+        console.error('Error recalculating map for fullscreen:', error);
+    }
 }
 
 function endGame() {
@@ -993,19 +1155,36 @@ function endGame() {
 function initializeGame() {
     game = new Phaser.Game(config);
     
-    // Handle screen resize and orientation changes
+    // Handle screen resize and orientation changes with improved fullscreen support
     window.addEventListener('resize', () => {
         if (game && game.scene && game.scene.scenes[0]) {
+            console.log('Window resize event');
             game.scale.resize(window.innerWidth, window.innerHeight);
+            
+            // Recalculate map if game is active
+            const gameScene = game.scene.scenes[0];
+            if (gameScene.scene.isActive()) {
+                setTimeout(() => {
+                    recalculateMapForFullscreen(gameScene);
+                }, 50);
+            }
         }
     });
     
     window.addEventListener('orientationchange', () => {
+        console.log('Orientation change event');
         setTimeout(() => {
             if (game && game.scene && game.scene.scenes[0]) {
+                console.log('Processing orientation change');
                 game.scale.resize(window.innerWidth, window.innerHeight);
+                
+                // Recalculate map after orientation change
+                const gameScene = game.scene.scenes[0];
+                if (gameScene.scene.isActive()) {
+                    recalculateMapForFullscreen(gameScene);
+                }
             }
-        }, 100);
+        }, 200); // Increased timeout for orientation change
     });
 }
 
