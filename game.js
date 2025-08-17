@@ -173,6 +173,9 @@ function create() {
     mapSprite.setOrigin(0, 0);
     this.mapSprite = mapSprite; // Store reference for mobile handler
     
+    // Initialize coordinate manager with actual map dimensions
+    coordinateManager.initialize(mapSprite.width, mapSprite.height);
+    
     // Get actual screen dimensions
     const screenWidth = this.scale.width;
     const screenHeight = this.scale.height;
@@ -198,34 +201,75 @@ function create() {
                      ('ontouchstart' in window) || 
                      (navigator.maxTouchPoints > 0);
     
-    // Use coordinate manager for optimal scaling calculation
-    scale = coordinateManager.calculateOptimalScale(screenWidth, screenHeight, isMobile);
+    // Use coordinate manager for optimal scaling calculation if available, fallback to original logic
+    if (coordinateManager && typeof coordinateManager.calculateOptimalScale === 'function') {
+        scale = coordinateManager.calculateOptimalScale(screenWidth, screenHeight, isMobile);
+    } else {
+        // Fallback to original scaling logic
+        console.warn('CoordinateManager not available, using fallback scaling');
+        if (isMobile) {
+            const isLandscape = screenWidth > screenHeight;
+            const mapIsPortrait = mapSprite.height > mapSprite.width;
+            
+            if (isLandscape) {
+                scale = Math.min(scaleX * 0.95, scaleY * 0.90);
+                if (scale < 0.5) scale = 0.5;
+                else if (scale > 1.0) scale = 1.0;
+            } else if (mapIsPortrait) {
+                if (scale < 0.4) scale = 0.4;
+                else if (scale > 0.8) scale = 0.8;
+            }
+        } else {
+            // Desktop - use nearly full space
+            if (scale > 0.98) scale = 0.98;
+        }
+    }
     
     // Get centered offset
-    const offset = coordinateManager.calculateCenteredOffset(scale, screenWidth, screenHeight);
+    let offsetX, offsetY;
+    if (coordinateManager && typeof coordinateManager.calculateCenteredOffset === 'function') {
+        const offset = coordinateManager.calculateCenteredOffset(scale, screenWidth, screenHeight);
+        offsetX = offset.offsetX;
+        offsetY = offset.offsetY;
+    } else {
+        // Fallback to manual calculation
+        offsetX = (screenWidth - mapSprite.width * scale) / 2;
+        offsetY = (screenHeight - mapSprite.height * scale) / 2;
+    }
     
     mapSprite.setScale(scale);
     
     // Center the map properly using coordinate manager
-    mapSprite.x = offset.offsetX;
-    mapSprite.y = offset.offsetY;
+    mapSprite.x = offsetX;
+    mapSprite.y = offsetY;
     
     // Store map transform for coordinate conversion
     this.mapScale = scale;
-    this.mapOffsetX = offset.offsetX;
-    this.mapOffsetY = offset.offsetY;
+    this.mapOffsetX = offsetX;
+    this.mapOffsetY = offsetY;
     this.mapWidth = mapSprite.displayWidth;
     this.mapHeight = mapSprite.displayHeight;
     
-    // Update coordinate manager with current transform
-    coordinateManager.updateTransform(scale, offset.offsetX, offset.offsetY);
+    // Update coordinate manager with current transform if available
+    if (coordinateManager && typeof coordinateManager.updateTransform === 'function') {
+        coordinateManager.updateTransform(scale, offsetX, offsetY);
+    }
 
     // Create player (Dr Boogie) - start in center of map using coordinate manager
-    const centerPos = coordinateManager.mapToScreen(
-        coordinateManager.baseMapWidth / 2, 
-        coordinateManager.baseMapHeight / 2
-    );
-    player = this.physics.add.sprite(centerPos.x, centerPos.y, 'drBoogie');
+    let centerX, centerY;
+    if (coordinateManager && typeof coordinateManager.mapToScreen === 'function') {
+        const centerPos = coordinateManager.mapToScreen(
+            coordinateManager.baseMapWidth / 2, 
+            coordinateManager.baseMapHeight / 2
+        );
+        centerX = centerPos.x;
+        centerY = centerPos.y;
+    } else {
+        // Fallback to manual calculation
+        centerX = this.mapOffsetX + (this.mapWidth / 2);
+        centerY = this.mapOffsetY + (this.mapHeight / 2);
+    }
+    player = this.physics.add.sprite(centerX, centerY, 'drBoogie');
     
     // Set world bounds to map area instead of screen
     this.physics.world.setBounds(
@@ -256,11 +300,20 @@ function create() {
     landmarks = this.physics.add.group();
     
     landmarkData.forEach((landmarkInfo, index) => {
-        // Use coordinate manager for accurate map-to-screen conversion
-        const screenPos = coordinateManager.mapToScreen(landmarkInfo.x, landmarkInfo.y);
+        // Use coordinate manager for accurate map-to-screen conversion if available
+        let screenX, screenY;
+        if (coordinateManager && typeof coordinateManager.mapToScreen === 'function') {
+            const screenPos = coordinateManager.mapToScreen(landmarkInfo.x, landmarkInfo.y);
+            screenX = screenPos.x;
+            screenY = screenPos.y;
+        } else {
+            // Fallback to manual calculation
+            screenX = this.mapOffsetX + (landmarkInfo.x * this.mapScale);
+            screenY = this.mapOffsetY + (landmarkInfo.y * this.mapScale);
+        }
         
         // Create invisible circular collision area, centered
-        const landmark = this.physics.add.sprite(screenPos.x, screenPos.y, null);
+        const landmark = this.physics.add.sprite(screenX, screenY, null);
         landmark.setImmovable(true);
         landmark.landmarkData = landmarkInfo;
         landmark.setVisible(false); // Make it invisible
@@ -273,19 +326,21 @@ function create() {
 
         // Create colored dot overlay for visual feedback
         const dotOverlay = this.add.graphics();
-        dotOverlay.x = screenPos.x;
-        dotOverlay.y = screenPos.y;
+        dotOverlay.x = screenX;
+        dotOverlay.y = screenY;
         landmark.dotOverlay = dotOverlay;
         
-        // Track landmark with mobile handler for orientation changes
-        mobileHandler.addElementToTrack(landmark, 'landmark', {
-            mapX: landmarkInfo.x,
-            mapY: landmarkInfo.y
-        });
-        mobileHandler.addElementToTrack(dotOverlay, 'dotOverlay', {
-            mapX: landmarkInfo.x,
-            mapY: landmarkInfo.y
-        });
+        // Track landmark with mobile handler if available
+        if (mobileHandler && typeof mobileHandler.addElementToTrack === 'function') {
+            mobileHandler.addElementToTrack(landmark, 'landmark', {
+                mapX: landmarkInfo.x,
+                mapY: landmarkInfo.y
+            });
+            mobileHandler.addElementToTrack(dotOverlay, 'dotOverlay', {
+                mapX: landmarkInfo.x,
+                mapY: landmarkInfo.y
+            });
+        }
     });
 
     // Create disasters group
@@ -490,17 +545,15 @@ function spawnDisaster() {
     disaster.originalMapX = mapX;
     disaster.originalMapY = mapY;
     
-    // Store original velocity and set current velocity
+    // Store original velocity
     disaster.originalVelocityX = velocityX;
     disaster.originalVelocityY = velocityY;
-    disaster.setVelocity(velocityX, velocityY);
     
     // Track disaster with mobile handler
     mobileHandler.addElementToTrack(disaster, 'disaster', {
         mapX: mapX,
         mapY: mapY
     });
-    disaster.originalVelocityY = velocityY;
     
     // If frozen, don't move initially
     if (isFrozen) {
@@ -1247,10 +1300,12 @@ function recalculateMapForFullscreen(scene) {
         
         console.log(`New map scale: ${scale}, offset: (${scene.mapOffsetX}, ${scene.mapOffsetY})`);
         
-        // Update map sprite if it exists
+        // Update map sprite if it exists (origin 0,0 as in create)
         if (scene.mapSprite) {
+            scene.mapSprite.setOrigin(0, 0);
             scene.mapSprite.setScale(scale);
-            scene.mapSprite.setPosition(scene.mapOffsetX + scaledMapWidth/2, scene.mapOffsetY + scaledMapHeight/2);
+            scene.mapSprite.x = scene.mapOffsetX;
+            scene.mapSprite.y = scene.mapOffsetY;
         }
         
         // Update player scale and position if exists

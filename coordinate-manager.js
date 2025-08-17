@@ -5,7 +5,9 @@
 
 class CoordinateManager {
     constructor() {
-        this.baseMapDimensions = { width: 1200, height: 800 };
+        // Will be set dynamically when map loads
+        this.baseMapWidth = 1200; // Default, will be updated
+        this.baseMapHeight = 800; // Default, will be updated
         this.currentTransform = {
             scale: 1,
             offsetX: 0,
@@ -13,6 +15,15 @@ class CoordinateManager {
         };
         this.coordinateHistory = [];
         this.maxHistorySize = 10;
+    }
+    
+    /**
+     * Initialize with actual map dimensions
+     */
+    initialize(mapWidth, mapHeight) {
+        this.baseMapWidth = mapWidth;
+        this.baseMapHeight = mapHeight;
+        console.log(`CoordinateManager initialized with map dimensions: ${mapWidth}x${mapHeight}`);
     }
     
     /**
@@ -79,22 +90,29 @@ class CoordinateManager {
      * Calculate optimal scaling for given screen dimensions
      */
     calculateOptimalScale(screenWidth, screenHeight, isMobile = false) {
-        const scaleX = screenWidth / this.baseMapDimensions.width;
-        const scaleY = screenHeight / this.baseMapDimensions.height;
+        const scaleX = screenWidth / this.baseMapWidth;
+        const scaleY = screenHeight / this.baseMapHeight;
         let scale = Math.min(scaleX, scaleY);
         
         if (isMobile) {
             const isLandscape = screenWidth > screenHeight;
+            const mapIsPortrait = this.baseMapHeight > this.baseMapWidth;
             
             if (isLandscape) {
+                // In landscape mode, use more of the available space
                 scale = Math.min(scaleX * 0.95, scaleY * 0.90);
-                scale = Math.max(0.5, Math.min(scale, 1.0));
-            } else {
-                scale = Math.max(0.4, Math.min(scale, 0.8));
+                // Ensure minimum visibility
+                if (scale < 0.5) scale = 0.5;
+                else if (scale > 1.0) scale = 1.0;
+            } else if (mapIsPortrait) {
+                // In portrait mode, use conservative scaling
+                if (scale < 0.4) scale = 0.4;
+                else if (scale > 0.8) scale = 0.8;
             }
         } else {
-            // Desktop scaling
-            scale = Math.min(scale, 0.98);
+            // Desktop - use full available space (no artificial cap)
+            // Keep the map fully visible while maximizing size
+            scale = Math.min(scaleX, scaleY);
         }
         
         return scale;
@@ -104,8 +122,8 @@ class CoordinateManager {
      * Calculate centered offset for map positioning
      */
     calculateCenteredOffset(scale, screenWidth, screenHeight) {
-        const scaledMapWidth = this.baseMapDimensions.width * scale;
-        const scaledMapHeight = this.baseMapDimensions.height * scale;
+        const scaledMapWidth = this.baseMapWidth * scale;
+        const scaledMapHeight = this.baseMapHeight * scale;
         
         return {
             offsetX: (screenWidth - scaledMapWidth) / 2,
@@ -114,11 +132,23 @@ class CoordinateManager {
     }
     
     /**
+     * Get map bounds in screen coordinates
+     */
+    getMapBounds() {
+        return {
+            left: this.currentTransform.offsetX,
+            right: this.currentTransform.offsetX + (this.baseMapWidth * this.currentTransform.scale),
+            top: this.currentTransform.offsetY,
+            bottom: this.currentTransform.offsetY + (this.baseMapHeight * this.currentTransform.scale)
+        };
+    }
+    
+    /**
      * Validate coordinates are within map bounds
      */
     isWithinMapBounds(mapX, mapY) {
-        return mapX >= 0 && mapX <= this.baseMapDimensions.width &&
-               mapY >= 0 && mapY <= this.baseMapDimensions.height;
+        return mapX >= 0 && mapX <= this.baseMapWidth &&
+               mapY >= 0 && mapY <= this.baseMapHeight;
     }
     
     /**
@@ -126,13 +156,13 @@ class CoordinateManager {
      */
     clampToMapBounds(mapX, mapY) {
         return {
-            x: Math.max(0, Math.min(mapX, this.baseMapDimensions.width)),
-            y: Math.max(0, Math.min(mapY, this.baseMapDimensions.height))
+            x: Math.max(0, Math.min(mapX, this.baseMapWidth)),
+            y: Math.max(0, Math.min(mapY, this.baseMapHeight))
         };
     }
     
     /**
-     * Get distance between two map coordinates
+     * Calculate distance between two points in map coordinates
      */
     getMapDistance(x1, y1, x2, y2) {
         const dx = x2 - x1;
@@ -141,7 +171,7 @@ class CoordinateManager {
     }
     
     /**
-     * Get distance between two screen coordinates
+     * Calculate distance between two points in screen coordinates
      */
     getScreenDistance(x1, y1, x2, y2) {
         const dx = x2 - x1;
@@ -150,5 +180,5 @@ class CoordinateManager {
     }
 }
 
-// Export for use in main game
+// Export for global access
 window.CoordinateManager = CoordinateManager;

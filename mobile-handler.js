@@ -206,16 +206,12 @@ class MobileHandler {
             
             console.log(`New scale: ${scale}, offset: (${this.gameScene.mapOffsetX}, ${this.gameScene.mapOffsetY})`);
             
-            // Update map sprite
-            if (this.gameScene.children && this.gameScene.children.list) {
-                const mapSprite = this.gameScene.children.list.find(child => child.texture && child.texture.key === 'mikkeliMap');
-                if (mapSprite) {
-                    mapSprite.setScale(scale);
-                    mapSprite.setPosition(
-                        this.gameScene.mapOffsetX + scaledMapWidth / 2,
-                        this.gameScene.mapOffsetY + scaledMapHeight / 2
-                    );
-                }
+            // Update map sprite (origin 0,0 as in create())
+            if (this.gameScene.mapSprite) {
+                this.gameScene.mapSprite.setOrigin(0, 0);
+                this.gameScene.mapSprite.setScale(scale);
+                this.gameScene.mapSprite.x = this.gameScene.mapOffsetX;
+                this.gameScene.mapSprite.y = this.gameScene.mapOffsetY;
             }
             
             setTimeout(resolve, 50);
@@ -313,10 +309,12 @@ class MobileHandler {
             const portraitReduction = isPortrait ? 0.7 : 1.0;
             
             window.disasters.children.entries.forEach((disaster) => {
-                if (disaster.originalX !== undefined && disaster.originalY !== undefined) {
+                const baseX = disaster.originalMapX ?? disaster.originalX;
+                const baseY = disaster.originalMapY ?? disaster.originalY;
+                if (baseX !== undefined && baseY !== undefined) {
                     // Recalculate position
-                    const screenX = this.gameScene.mapOffsetX + (disaster.originalX * this.gameScene.mapScale);
-                    const screenY = this.gameScene.mapOffsetY + (disaster.originalY * this.gameScene.mapScale);
+                    const screenX = this.gameScene.mapOffsetX + (baseX * this.gameScene.mapScale);
+                    const screenY = this.gameScene.mapOffsetY + (baseY * this.gameScene.mapScale);
                     disaster.setPosition(screenX, screenY);
                     
                     // Update scale
@@ -339,6 +337,21 @@ class MobileHandler {
             console.log('Disasters updated');
             resolve();
         });
+    }
+
+    addElementToTrack(element, type, data) {
+        // Minimal tracking implementation to work with game.js calls
+        if (!element || !this.gameScene) return;
+        if (type === 'landmark') {
+            element.originalMapX = data?.mapX;
+            element.originalMapY = data?.mapY;
+        } else if (type === 'dotOverlay') {
+            element.originalMapX = data?.mapX;
+            element.originalMapY = data?.mapY;
+        } else if (type === 'disaster' || type === 'powerUp') {
+            element.originalMapX = data?.mapX;
+            element.originalMapY = data?.mapY;
+        }
     }
     
     async updatePowerUps() {
