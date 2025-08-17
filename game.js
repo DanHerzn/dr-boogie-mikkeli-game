@@ -217,9 +217,13 @@ function create() {
             }
         }
     } else {
-        // Desktop - allow larger scales
-        if (scale > 0.95) {
-            scale = 0.95;
+        // Desktop - use original full space settings (like the first setup)
+        // Don't add any scaling restrictions, let it use the full available space
+        scale = Math.min(scaleX, scaleY);
+        
+        // For desktop, allow the map to use nearly the full screen like originally
+        if (scale > 0.98) {
+            scale = 0.98; // Use 98% of screen space on desktop
         }
     }
     
@@ -1034,8 +1038,18 @@ function setupFullscreen() {
     const fullscreenBtn = document.getElementById('fullscreenBtn');
     
     if (fullscreenBtn) {
-        // Show fullscreen button for all devices
-        fullscreenBtn.style.display = 'block';
+        // Only show fullscreen button on mobile devices
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                         ('ontouchstart' in window) || 
+                         (navigator.maxTouchPoints > 0);
+        
+        if (isMobile) {
+            // Show fullscreen button for mobile devices
+            fullscreenBtn.style.display = 'block';
+        } else {
+            // Hide fullscreen button for desktop
+            fullscreenBtn.style.display = 'none';
+        }
         
         fullscreenBtn.addEventListener('click', (e) => {
             e.preventDefault();
@@ -1198,8 +1212,11 @@ function recalculateMapForFullscreen(scene) {
                     else if (scale > 0.8) scale = 0.8;
                 }
             } else {
-                if (scale < 0.5) scale = 0.5;
-                else if (scale > 1.2) scale = 1.2;
+                // Desktop - use original full space settings
+                scale = Math.min(scaleX, scaleY);
+                if (scale > 0.98) {
+                    scale = 0.98; // Use 98% of screen space like originally
+                }
             }
         }
         
