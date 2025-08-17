@@ -42,7 +42,7 @@
         <!-- Game Screen -->
         <div id="gameScreen" class="screen">
             <div id="gameUI">
-                <div class="ui-top">
+                <div class="ui-overlay">
                     <div class="timer">Time: <span id="timeLeft">60</span>s</div>
                     <div class="score">Score: <span id="currentScore">0</span></div>
                     <button id="fullscreenBtn" class="fullscreen-btn" title="Toggle Fullscreen">⛶</button>
@@ -53,13 +53,15 @@
             <!-- Mobile Controls -->
             <div id="mobileControls" class="mobile-controls">
                 <div class="arrow-controls">
-                    <div class="arrow-row">
+                    <div class="arrow-row top">
                         <button id="upArrow" class="arrow-btn up">↑</button>
                     </div>
-                    <div class="arrow-row">
+                    <div class="arrow-row bottom">
                         <button id="leftArrow" class="arrow-btn left">←</button>
-                        <button id="downArrow" class="arrow-btn down">↓</button>
                         <button id="rightArrow" class="arrow-btn right">→</button>
+                    </div>
+                    <div class="arrow-row center">
+                        <button id="downArrow" class="arrow-btn down">↓</button>
                     </div>
                 </div>
             </div>

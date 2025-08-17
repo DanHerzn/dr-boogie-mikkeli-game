@@ -200,21 +200,35 @@ body {
     pointer-events: none;
 }
 
-.ui-top {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    padding: 10px;
+.ui-overlay {
     position: fixed;
-    top: 10px;
-    left: 10px;
-    right: 10px;
+    top: 0;
+    left: 0;
+    right: 0;
     z-index: 1001;
-    pointer-events: none; /* Allow clicks through the container */
+    pointer-events: none;
 }
 
-.ui-top > * {
-    pointer-events: auto; /* But allow clicks on the actual UI elements */
+.timer {
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    pointer-events: auto;
+}
+
+.score {
+    position: absolute;
+    top: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    pointer-events: auto;
+}
+
+.fullscreen-btn {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    pointer-events: auto;
 }
 
 .timer, .score {
@@ -270,28 +284,31 @@ body {
     height: 100vh !important;
 }
 
-:fullscreen .ui-top,
-:-webkit-full-screen .ui-top,
-:-moz-full-screen .ui-top,
-:-ms-fullscreen .ui-top {
-    padding: 6px;
+:fullscreen .timer,
+:-webkit-full-screen .timer,
+:-moz-full-screen .timer,
+:-ms-fullscreen .timer {
     top: 6px;
     left: 6px;
-    right: 6px;
+    font-size: 0.8rem;
+    padding: 4px 8px;
 }
 
-:fullscreen .timer,
 :fullscreen .score,
-:fullscreen .fullscreen-btn,
-:-webkit-full-screen .timer,
 :-webkit-full-screen .score,
-:-webkit-full-screen .fullscreen-btn,
-:-moz-full-screen .timer,
 :-moz-full-screen .score,
+:-ms-fullscreen .score {
+    top: 6px;
+    font-size: 0.8rem;
+    padding: 4px 8px;
+}
+
+:fullscreen .fullscreen-btn,
+:-webkit-full-screen .fullscreen-btn,
 :-moz-full-screen .fullscreen-btn,
-:-ms-fullscreen .timer,
-:-ms-fullscreen .score,
 :-ms-fullscreen .fullscreen-btn {
+    top: 6px;
+    right: 6px;
     font-size: 0.8rem;
     padding: 4px 8px;
 }
@@ -472,16 +489,32 @@ body {
 }
 
 .arrow-controls {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 5px;
+    position: relative;
+    width: 140px;
+    height: 140px;
 }
 
-.arrow-row {
+.arrow-row.top {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.arrow-row.bottom {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
     display: flex;
-    gap: 5px;
-    align-items: center;
+    justify-content: space-between;
+}
+
+.arrow-row.center {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
 }
 
 .arrow-btn {
@@ -525,14 +558,16 @@ body {
     }
     
     /* Compact UI for mobile - maintain overlay design */
-    .ui-top {
-        padding: 8px;
-        top: 8px;
-        left: 8px;
-        right: 8px;
+    .timer {
+        top: 10px;
+        left: 10px;
+        font-size: 0.9rem;
+        padding: 6px 12px;
+        border-radius: 15px;
     }
     
-    .timer, .score {
+    .score {
+        top: 10px;
         font-size: 0.9rem;
         padding: 6px 12px;
         border-radius: 15px;
@@ -540,6 +575,8 @@ body {
     
     /* Fullscreen button styling for mobile */
     .fullscreen-btn {
+        top: 10px;
+        right: 10px;
         font-size: 1rem;
         padding: 6px 10px;
     }

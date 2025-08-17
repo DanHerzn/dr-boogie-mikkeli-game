@@ -171,18 +171,40 @@ function create() {
     // Always use the smaller scale to ensure the map fits completely (no overflow)
     let scale = Math.min(scaleX, scaleY);
     
+    // Detect orientation
+    const mapIsPortrait = screenHeight > screenWidth;
+    const isLandscape = screenWidth > screenHeight;
+    
     // For mobile devices, ensure reasonable minimum and maximum scales
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
                      ('ontouchstart' in window) || 
                      (navigator.maxTouchPoints > 0);
     
     if (isMobile) {
-        // Ensure map isn't too small (minimum 40% scale)
-        if (scale < 0.4) {
-            scale = 0.4;
+        if (isLandscape) {
+            // In landscape mode, use more of the available space for better map visibility
+            scale = Math.min(scaleX * 0.95, scaleY * 0.90); // Use 95% of width, 90% of height
+            
+            // Ensure minimum visibility
+            if (scale < 0.5) {
+                scale = 0.5;
+            }
+            // Allow larger scale in landscape
+            else if (scale > 1.0) {
+                scale = 1.0;
+            }
+        } else if (mapIsPortrait) {
+            // In portrait mode, use conservative scaling
+            if (scale < 0.4) {
+                scale = 0.4;
+            }
+            else if (scale > 0.8) {
+                scale = 0.8;
+            }
         }
-        // Allow larger scale for better visibility (maximum 95% of screen)
-        else if (scale > 0.95) {
+    } else {
+        // Desktop - allow larger scales
+        if (scale > 0.95) {
             scale = 0.95;
         }
     }
