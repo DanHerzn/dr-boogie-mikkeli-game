@@ -164,12 +164,9 @@ function create() {
     const screenHeight = this.scale.height;
     
     // Calculate scale to ensure map fits properly in all orientations
-    // Reserve space for UI elements (about 60px on top for mobile)
-    const uiReservedSpace = 60;
-    const availableHeight = screenHeight - uiReservedSpace;
-    
+    // No UI space reservation - UI will overlay on the map
     const scaleX = screenWidth / mapSprite.width;
-    const scaleY = availableHeight / mapSprite.height;
+    const scaleY = screenHeight / mapSprite.height;
     
     // Always use the smaller scale to ensure the map fits completely (no overflow)
     let scale = Math.min(scaleX, scaleY);
@@ -179,45 +176,22 @@ function create() {
                      ('ontouchstart' in window) || 
                      (navigator.maxTouchPoints > 0);
     
-    // Check if we're in fullscreen mode
-    const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement || 
-                        document.mozFullScreenElement || document.msFullscreenElement;
-    
     if (isMobile) {
-        if (isFullscreen) {
-            // In fullscreen mode, use more of the available space
-            // Reserve less space for UI
-            const fullscreenUISpace = 40;
-            const fullscreenAvailableHeight = screenHeight - fullscreenUISpace;
-            const fullscreenScaleY = fullscreenAvailableHeight / mapSprite.height;
-            scale = Math.min(scaleX, fullscreenScaleY);
-            
-            // Allow larger scale in fullscreen
-            if (scale > 1.0) {
-                scale = 1.0; // Don't exceed original size
-            }
-        } else {
-            // Normal mobile mode with original limits
-            if (scale < 0.3) {
-                scale = 0.3;
-            }
-            // Ensure map doesn't get too big (maximum 85% of available space)
-            else if (scale > 0.85) {
-                scale = 0.85;
-            }
+        // Ensure map isn't too small (minimum 40% scale)
+        if (scale < 0.4) {
+            scale = 0.4;
+        }
+        // Allow larger scale for better visibility (maximum 95% of screen)
+        else if (scale > 0.95) {
+            scale = 0.95;
         }
     }
     
     mapSprite.setScale(scale);
     
-    // Center the map properly
+    // Center the map properly using full screen
     mapSprite.x = (screenWidth - mapSprite.displayWidth) / 2;
-    mapSprite.y = uiReservedSpace + (availableHeight - mapSprite.displayHeight) / 2;
-    
-    // Ensure map doesn't go above UI area
-    if (mapSprite.y < uiReservedSpace) {
-        mapSprite.y = uiReservedSpace;
-    }
+    mapSprite.y = (screenHeight - mapSprite.displayHeight) / 2;
     
     // Store map transform for landmark positioning and bounds
     this.mapScale = scale;
@@ -240,9 +214,9 @@ function create() {
     );
     
     player.setCollideWorldBounds(true);
-    // Scale player proportionally to map scale, smaller in portrait mode
+    // Scale player proportionally to map scale, much smaller in portrait mode
     const isPortrait = this.scale.height > this.scale.width;
-    const portraitReduction = isPortrait ? 0.7 : 1.0; // 30% smaller in portrait
+    const portraitReduction = isPortrait ? 0.5 : 1.0; // 50% smaller in portrait (was 30%)
     const playerScale = 0.15 * Math.max(0.6, this.mapScale) * portraitReduction;
     player.setScale(playerScale);
     player.body.setSize(player.width * 0.8, player.height * 0.8); // Adjust collision box
@@ -845,61 +819,95 @@ function collectPowerUp(player, powerUp) {
 // Fullscreen functionality
 function setupFullscreen() {
     const fullscreenBtn = document.getElementById('fullscreenBtn');
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
-                     ('ontouchstart' in window) || 
-                     (navigator.maxTouchPoints > 0);
     
-    if (isMobile && fullscreenBtn) {
+    if (fullscreenBtn) {
+        // Show fullscreen button for all devices
         fullscreenBtn.style.display = 'block';
         
-        fullscreenBtn.addEventListener('click', toggleFullscreen);
+        fullscreenBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleFullscreen();
+        });
         
         // Listen for fullscreen changes to update button appearance
         document.addEventListener('fullscreenchange', updateFullscreenButton);
         document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
         document.addEventListener('mozfullscreenchange', updateFullscreenButton);
         document.addEventListener('MSFullscreenChange', updateFullscreenButton);
+        
+        console.log('Fullscreen setup complete');
+    } else {
+        console.error('Fullscreen button not found');
     }
 }
 
 function toggleFullscreen() {
-    const gameContainer = document.getElementById('gameContainer');
-    
-    if (!document.fullscreenElement && !document.webkitFullscreenElement && 
-        !document.mozFullScreenElement && !document.msFullscreenElement) {
-        // Enter fullscreen
-        if (gameContainer.requestFullscreen) {
-            gameContainer.requestFullscreen();
-        } else if (gameContainer.webkitRequestFullscreen) {
-            gameContainer.webkitRequestFullscreen();
-        } else if (gameContainer.mozRequestFullScreen) {
-            gameContainer.mozRequestFullScreen();
-        } else if (gameContainer.msRequestFullscreen) {
-            gameContainer.msRequestFullscreen();
-        }
+    try {
+        const gameContainer = document.getElementById('gameContainer');
+        console.log('Toggle fullscreen called');
         
-        // Lock orientation to landscape if possible
-        if (screen.orientation && screen.orientation.lock) {
-            screen.orientation.lock('landscape').catch(() => {
-                // Orientation lock failed, but that's ok
-            });
+        if (!document.fullscreenElement && !document.webkitFullscreenElement && 
+            !document.mozFullScreenElement && !document.msFullscreenElement) {
+            // Enter fullscreen
+            console.log('Entering fullscreen...');
+            
+            let fullscreenPromise;
+            if (gameContainer.requestFullscreen) {
+                fullscreenPromise = gameContainer.requestFullscreen();
+            } else if (gameContainer.webkitRequestFullscreen) {
+                fullscreenPromise = gameContainer.webkitRequestFullscreen();
+            } else if (gameContainer.mozRequestFullScreen) {
+                fullscreenPromise = gameContainer.mozRequestFullScreen();
+            } else if (gameContainer.msRequestFullscreen) {
+                fullscreenPromise = gameContainer.msRequestFullscreen();
+            } else {
+                console.error('Fullscreen not supported');
+                return;
+            }
+            
+            // Handle promise if it exists
+            if (fullscreenPromise && fullscreenPromise.then) {
+                fullscreenPromise.then(() => {
+                    console.log('Fullscreen entered successfully');
+                    // Lock orientation to landscape if possible
+                    if (screen.orientation && screen.orientation.lock) {
+                        screen.orientation.lock('landscape').catch((err) => {
+                            console.log('Orientation lock failed:', err);
+                        });
+                    }
+                }).catch((err) => {
+                    console.error('Fullscreen failed:', err);
+                });
+            } else {
+                // Lock orientation to landscape if possible
+                if (screen.orientation && screen.orientation.lock) {
+                    screen.orientation.lock('landscape').catch((err) => {
+                        console.log('Orientation lock failed:', err);
+                    });
+                }
+            }
+        } else {
+            // Exit fullscreen
+            console.log('Exiting fullscreen...');
+            
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            } else if (document.mozCancelFullScreen) {
+                document.mozCancelFullScreen();
+            } else if (document.msExitFullscreen) {
+                document.msExitFullscreen();
+            }
+            
+            // Unlock orientation
+            if (screen.orientation && screen.orientation.unlock) {
+                screen.orientation.unlock();
+            }
         }
-    } else {
-        // Exit fullscreen
-        if (document.exitFullscreen) {
-            document.exitFullscreen();
-        } else if (document.webkitExitFullscreen) {
-            document.webkitExitFullscreen();
-        } else if (document.mozCancelFullScreen) {
-            document.mozCancelFullScreen();
-        } else if (document.msExitFullscreen) {
-            document.msExitFullscreen();
-        }
-        
-        // Unlock orientation
-        if (screen.orientation && screen.orientation.unlock) {
-            screen.orientation.unlock();
-        }
+    } catch (error) {
+        console.error('Fullscreen error:', error);
     }
 }
 

@@ -203,41 +203,49 @@ body {
 .ui-top {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    padding: 5px 10px;
-    background: rgba(0, 0, 0, 0.3);
-    -webkit-backdrop-filter: blur(10px);
-    backdrop-filter: blur(10px);
+    align-items: flex-start;
+    padding: 10px;
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
+    top: 10px;
+    left: 10px;
+    right: 10px;
     z-index: 1001;
+    pointer-events: none; /* Allow clicks through the container */
+}
+
+.ui-top > * {
+    pointer-events: auto; /* But allow clicks on the actual UI elements */
 }
 
 .timer, .score {
     color: white;
-    font-size: 1.3rem;
+    font-size: 1.1rem;
     font-weight: bold;
-    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-    background: rgba(255, 255, 255, 0.1);
-    padding: 10px 20px;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+    background: rgba(0, 0, 0, 0.7);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    padding: 8px 16px;
     border-radius: 20px;
-    border: 2px solid rgba(255, 255, 255, 0.2);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .fullscreen-btn {
     color: white;
-    font-size: 1.4rem;
+    font-size: 1.2rem;
     font-weight: bold;
-    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-    background: rgba(255, 255, 255, 0.1);
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+    background: rgba(0, 0, 0, 0.7);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
     padding: 8px 12px;
     border-radius: 50%;
-    border: 2px solid rgba(255, 255, 255, 0.2);
+    border: 2px solid rgba(255, 255, 255, 0.3);
     cursor: pointer;
     transition: all 0.3s ease;
-    display: none; /* Hidden by default, shown on mobile */
+    display: block; /* Show on all devices */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .fullscreen-btn:hover {
@@ -266,8 +274,10 @@ body {
 :-webkit-full-screen .ui-top,
 :-moz-full-screen .ui-top,
 :-ms-fullscreen .ui-top {
-    padding: 3px 8px;
-    background: rgba(0, 0, 0, 0.7);
+    padding: 6px;
+    top: 6px;
+    left: 6px;
+    right: 6px;
 }
 
 :fullscreen .timer,
@@ -282,7 +292,7 @@ body {
 :-ms-fullscreen .timer,
 :-ms-fullscreen .score,
 :-ms-fullscreen .fullscreen-btn {
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     padding: 4px 8px;
 }
 
@@ -514,21 +524,22 @@ body {
         display: block;
     }
     
-    /* Compact UI for mobile */
+    /* Compact UI for mobile - maintain overlay design */
     .ui-top {
-        padding: 5px 10px;
-        background: rgba(0, 0, 0, 0.6);
+        padding: 8px;
+        top: 8px;
+        left: 8px;
+        right: 8px;
     }
     
     .timer, .score {
         font-size: 0.9rem;
-        padding: 5px 12px;
+        padding: 6px 12px;
         border-radius: 15px;
     }
     
-    /* Show fullscreen button on mobile */
+    /* Fullscreen button styling for mobile */
     .fullscreen-btn {
-        display: block;
         font-size: 1rem;
         padding: 6px 10px;
     }
