@@ -787,6 +787,13 @@ function setupMobileControls() {
         if (mobileControlsElement) {
             mobileControlsElement.style.display = 'block';
         }
+        
+        // Show orientation hint on mobile if in portrait mode
+        checkOrientation();
+        window.addEventListener('orientationchange', () => {
+            setTimeout(checkOrientation, 100);
+        });
+        window.addEventListener('resize', checkOrientation);
     }
     
     // Add event listeners for arrow buttons
@@ -885,6 +892,35 @@ function setupMobileControls() {
         mobileControls.left = false;
         mobileControls.right = false;
     });
+}
+
+// Orientation handling functions
+function checkOrientation() {
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                     ('ontouchstart' in window) || 
+                     (navigator.maxTouchPoints > 0);
+    
+    if (isMobile && window.innerHeight > window.innerWidth) {
+        // Portrait mode on mobile - show hint
+        showOrientationHint();
+    } else {
+        // Landscape mode or desktop - hide hint
+        hideOrientationHint();
+    }
+}
+
+function showOrientationHint() {
+    const hint = document.getElementById('orientationHint');
+    if (hint) {
+        hint.classList.add('show');
+    }
+}
+
+function hideOrientationHint() {
+    const hint = document.getElementById('orientationHint');
+    if (hint) {
+        hint.classList.remove('show');
+    }
 }
 
 // Initialize when page loads
