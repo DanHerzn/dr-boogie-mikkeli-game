@@ -37,6 +37,10 @@ let isGameRunning = false;
 let cursors;
 let pointer;
 
+// Mobile handling systems
+let mobileHandler = null;
+let coordinateManager = null;
+
 // Power-up variables
 let powerUps = [];
 let isFrozen = false;
@@ -155,9 +159,19 @@ function preload() {
 }
 
 function create() {
+    // Initialize mobile handling systems
+    if (!coordinateManager) {
+        coordinateManager = new CoordinateManager();
+    }
+    if (!mobileHandler) {
+        mobileHandler = new MobileHandler();
+        mobileHandler.setGameScene(this);
+    }
+    
     // Create background using the actual Mikkeli map
     const mapSprite = this.add.image(0, 0, 'mikkeliMap');
     mapSprite.setOrigin(0, 0);
+    this.mapSprite = mapSprite; // Store reference for mobile handler
     
     // Get actual screen dimensions
     const screenWidth = this.scale.width;
@@ -184,66 +198,34 @@ function create() {
                      ('ontouchstart' in window) || 
                      (navigator.maxTouchPoints > 0);
     
-    if (isFullscreen) {
-        // In fullscreen mode, different behavior for mobile vs desktop
-        if (isMobile) {
-            // Mobile fullscreen: use 98% of screen
-            scale = scale * 0.98;
-        } else {
-            // Desktop fullscreen: use 100% (maximum scale while maintaining aspect ratio)
-            scale = scale * 1.0;
-        }
-        console.log(`Fullscreen mode: using ${isMobile ? '98%' : '100%'} scale for ${isMobile ? 'mobile' : 'desktop'}`);
-    } else if (isMobile) {
-        if (isLandscape) {
-            // In landscape mode, use more of the available space for better map visibility
-            scale = Math.min(scaleX * 0.95, scaleY * 0.90); // Use 95% of width, 90% of height
-            
-            // Ensure minimum visibility
-            if (scale < 0.5) {
-                scale = 0.5;
-            }
-            // Allow larger scale in landscape
-            else if (scale > 1.0) {
-                scale = 1.0;
-            }
-        } else if (mapIsPortrait) {
-            // In portrait mode, use conservative scaling
-            if (scale < 0.4) {
-                scale = 0.4;
-            }
-            else if (scale > 0.8) {
-                scale = 0.8;
-            }
-        }
-    } else {
-        // Desktop - use original full space settings (like the first setup)
-        // Don't add any scaling restrictions, let it use the full available space
-        scale = Math.min(scaleX, scaleY);
-        
-        // For desktop, allow the map to use nearly the full screen like originally
-        if (scale > 0.98) {
-            scale = 0.98; // Use 98% of screen space on desktop
-        }
-    }
+    // Use coordinate manager for optimal scaling calculation
+    scale = coordinateManager.calculateOptimalScale(screenWidth, screenHeight, isMobile);
+    
+    // Get centered offset
+    const offset = coordinateManager.calculateCenteredOffset(scale, screenWidth, screenHeight);
     
     mapSprite.setScale(scale);
     
-    // Center the map properly using full screen
-    mapSprite.x = (screenWidth - mapSprite.displayWidth) / 2;
-    mapSprite.y = (screenHeight - mapSprite.displayHeight) / 2;
+    // Center the map properly using coordinate manager
+    mapSprite.x = offset.offsetX;
+    mapSprite.y = offset.offsetY;
     
-    // Store map transform for landmark positioning and bounds
+    // Store map transform for coordinate conversion
     this.mapScale = scale;
-    this.mapOffsetX = mapSprite.x;
-    this.mapOffsetY = mapSprite.y;
+    this.mapOffsetX = offset.offsetX;
+    this.mapOffsetY = offset.offsetY;
     this.mapWidth = mapSprite.displayWidth;
     this.mapHeight = mapSprite.displayHeight;
+    
+    // Update coordinate manager with current transform
+    coordinateManager.updateTransform(scale, offset.offsetX, offset.offsetY);
 
-    // Create player (Dr Boogie) - start in center of map
-    const startX = this.mapOffsetX + (this.mapWidth / 2);
-    const startY = this.mapOffsetY + (this.mapHeight / 2);
-    player = this.physics.add.sprite(startX, startY, 'drBoogie');
+    // Create player (Dr Boogie) - start in center of map using coordinate manager
+    const centerPos = coordinateManager.mapToScreen(
+        coordinateManager.baseMapWidth / 2, 
+        coordinateManager.baseMapHeight / 2
+    );
+    player = this.physics.add.sprite(centerPos.x, centerPos.y, 'drBoogie');
     
     // Set world bounds to map area instead of screen
     this.physics.world.setBounds(
@@ -274,27 +256,36 @@ function create() {
     landmarks = this.physics.add.group();
     
     landmarkData.forEach((landmarkInfo, index) => {
-        // Transform landmark coordinates to screen coordinates
-        const screenX = this.mapOffsetX + (landmarkInfo.x * this.mapScale);
-        const screenY = this.mapOffsetY + (landmarkInfo.y * this.mapScale);
+        // Use coordinate manager for accurate map-to-screen conversion
+        const screenPos = coordinateManager.mapToScreen(landmarkInfo.x, landmarkInfo.y);
         
-    // Create invisible circular collision area, centered
-    const landmark = this.physics.add.sprite(screenX, screenY, null);
-    landmark.setImmovable(true);
-    landmark.landmarkData = landmarkInfo;
-    landmark.setVisible(false); // Make it invisible
-    // Scale collision area with map scale (base 40px radius)
-    const landmarkRadius = Math.max(20, 40 * this.mapScale);
-    landmark.body.setCircle(landmarkRadius); // Scaled radius circle, centered
-    landmark.body.setOffset(0, 0); // No offset needed for circle collision
-    landmark.scene = this; // Store scene reference
-    landmarks.add(landmark);
+        // Create invisible circular collision area, centered
+        const landmark = this.physics.add.sprite(screenPos.x, screenPos.y, null);
+        landmark.setImmovable(true);
+        landmark.landmarkData = landmarkInfo;
+        landmark.setVisible(false); // Make it invisible
+        // Scale collision area with map scale (base 40px radius)
+        const landmarkRadius = Math.max(20, 40 * this.mapScale);
+        landmark.body.setCircle(landmarkRadius); // Scaled radius circle, centered
+        landmark.body.setOffset(0, 0); // No offset needed for circle collision
+        landmark.scene = this; // Store scene reference
+        landmarks.add(landmark);
 
-    // Create colored dot overlay for visual feedback
-    const dotOverlay = this.add.graphics();
-    dotOverlay.x = screenX;
-    dotOverlay.y = screenY;
-    landmark.dotOverlay = dotOverlay;
+        // Create colored dot overlay for visual feedback
+        const dotOverlay = this.add.graphics();
+        dotOverlay.x = screenPos.x;
+        dotOverlay.y = screenPos.y;
+        landmark.dotOverlay = dotOverlay;
+        
+        // Track landmark with mobile handler for orientation changes
+        mobileHandler.addElementToTrack(landmark, 'landmark', {
+            mapX: landmarkInfo.x,
+            mapY: landmarkInfo.y
+        });
+        mobileHandler.addElementToTrack(dotOverlay, 'dotOverlay', {
+            mapX: landmarkInfo.x,
+            mapY: landmarkInfo.y
+        });
     });
 
     // Create disasters group
@@ -364,6 +355,11 @@ function create() {
         callbackScope: this,
         loop: true
     });
+    
+    // Set up mobile orientation handler
+    if (mobileHandler) {
+        mobileHandler.setupOrientationHandling();
+    }
 }
 
 function update() {
@@ -453,51 +449,57 @@ function spawnDisaster() {
     const disasterTypes = ['meteor', 'flood', 'storm'];
     const type = Phaser.Utils.Array.GetRandom(disasterTypes);
     
-    // Get map boundaries for proper disaster spawning
+    // Get map boundaries using coordinate manager
     const scene = game.scene.getScene('default');
-    const mapLeft = scene.mapOffsetX;
-    const mapRight = scene.mapOffsetX + scene.mapWidth;
-    const mapTop = scene.mapOffsetY;
-    const mapBottom = scene.mapOffsetY + scene.mapHeight;
+    const mapBounds = coordinateManager.getMapBounds();
     
     // Spawn disasters from edges of the map area (not screen edges)
-    let x, y, velocityX = 0, velocityY = 0;
+    let mapX, mapY, velocityX = 0, velocityY = 0;
     const speedMultiplier = difficultySettings[difficulty].disasterSpeed;
     
     const side = Phaser.Math.Between(0, 3);
     switch (side) {
         case 0: // Top edge of map
-            x = Phaser.Math.Between(mapLeft, mapRight);
-            y = mapTop - 50;
+            mapX = Phaser.Math.Between(0, coordinateManager.baseMapWidth);
+            mapY = -50 / scene.mapScale; // Convert screen pixels to map coordinates
             velocityY = Phaser.Math.Between(80, 200) * speedMultiplier;
             break;
         case 1: // Right edge of map
-            x = mapRight + 50;
-            y = Phaser.Math.Between(mapTop, mapBottom);
+            mapX = coordinateManager.baseMapWidth + (50 / scene.mapScale);
+            mapY = Phaser.Math.Between(0, coordinateManager.baseMapHeight);
             velocityX = Phaser.Math.Between(-200, -80) * speedMultiplier;
             break;
         case 2: // Bottom edge of map
-            x = Phaser.Math.Between(mapLeft, mapRight);
-            y = mapBottom + 50;
+            mapX = Phaser.Math.Between(0, coordinateManager.baseMapWidth);
+            mapY = coordinateManager.baseMapHeight + (50 / scene.mapScale);
             velocityY = Phaser.Math.Between(-200, -80) * speedMultiplier;
             break;
         case 3: // Left edge of map
-            x = mapLeft - 50;
-            y = Phaser.Math.Between(mapTop, mapBottom);
+            mapX = -50 / scene.mapScale;
+            mapY = Phaser.Math.Between(0, coordinateManager.baseMapHeight);
             velocityX = Phaser.Math.Between(80, 200) * speedMultiplier;
             break;
     }
 
-    const disaster = disasters.create(x, y, type);
+    // Convert map coordinates to screen coordinates
+    const screenPos = coordinateManager.mapToScreen(mapX, mapY);
+    const disaster = disasters.create(screenPos.x, screenPos.y, type);
     disaster.disasterType = type;
     
-    // Store original map coordinates for fullscreen recalculation
-    const gameScene = game.scene.getScene('default');
-    disaster.originalX = (x - gameScene.mapOffsetX) / gameScene.mapScale;
-    disaster.originalY = (y - gameScene.mapOffsetY) / gameScene.mapScale;
+    // Store original map coordinates for coordinate manager tracking
+    disaster.originalMapX = mapX;
+    disaster.originalMapY = mapY;
     
     // Store original velocity and set current velocity
     disaster.originalVelocityX = velocityX;
+    disaster.originalVelocityY = velocityY;
+    disaster.setVelocity(velocityX, velocityY);
+    
+    // Track disaster with mobile handler
+    mobileHandler.addElementToTrack(disaster, 'disaster', {
+        mapX: mapX,
+        mapY: mapY
+    });
     disaster.originalVelocityY = velocityY;
     
     // If frozen, don't move initially
@@ -833,29 +835,31 @@ function spawnFreezePowerUp() {
     if (Date.now() - lastFreezeSpawn < 10000) return; // 10 second cooldown
     lastFreezeSpawn = Date.now();
     
-    // Get map boundaries for proper power-up spawning
-    const scene = game.scene.getScene('default');
-    const mapLeft = scene.mapOffsetX + 50; // Add margin from edges
-    const mapRight = scene.mapOffsetX + scene.mapWidth - 50;
-    const mapTop = scene.mapOffsetY + 50;
-    const mapBottom = scene.mapOffsetY + scene.mapHeight - 50;
+    // Get random position within map boundaries using coordinate manager
+    const mapMargin = 50;
+    const mapX = Phaser.Math.Between(mapMargin, coordinateManager.baseMapWidth - mapMargin);
+    const mapY = Phaser.Math.Between(mapMargin, coordinateManager.baseMapHeight - mapMargin);
     
-    // Random position within map boundaries
-    const x = Phaser.Math.Between(mapLeft, mapRight);
-    const y = Phaser.Math.Between(mapTop, mapBottom);
+    // Convert to screen coordinates
+    const screenPos = coordinateManager.mapToScreen(mapX, mapY);
+    const freezePowerUp = powerUps.create(screenPos.x, screenPos.y, 'freeze');
     
-    const freezePowerUp = powerUps.create(x, y, 'freeze');
-    
-    // Store original map coordinates for fullscreen recalculation
-    const freezeScene = game.scene.getScene('default');
-    freezePowerUp.originalX = (x - freezeScene.mapOffsetX) / freezeScene.mapScale;
-    freezePowerUp.originalY = (y - freezeScene.mapOffsetY) / freezeScene.mapScale;
+    // Store original map coordinates for coordinate manager tracking
+    freezePowerUp.originalMapX = mapX;
+    freezePowerUp.originalMapY = mapY;
     
     // Scale power-up proportionally to map scale, smaller in portrait mode
-    const isPortrait = freezeScene.scale.height > freezeScene.scale.width;
+    const scene = game.scene.getScene('default');
+    const isPortrait = scene.scale.height > scene.scale.width;
     const portraitReduction = isPortrait ? 0.7 : 1.0; // 30% smaller in portrait
-    const powerUpScale = 0.12 * Math.max(0.6, freezeScene.mapScale) * portraitReduction;
+    const powerUpScale = 0.12 * Math.max(0.6, scene.mapScale) * portraitReduction;
     freezePowerUp.setScale(powerUpScale);
+    
+    // Track power-up with mobile handler
+    mobileHandler.addElementToTrack(freezePowerUp, 'powerUp', {
+        mapX: mapX,
+        mapY: mapY
+    });
     
     // Set collision box based on the scaled power-up size
     if (freezePowerUp.body) {
@@ -874,7 +878,7 @@ function spawnFreezePowerUp() {
     // Add gentle floating animation
     game.scene.getScene('default').tweens.add({
         targets: freezePowerUp,
-        y: y - 10,
+        y: screenPos.y - 10,
         duration: 1000,
         yoyo: true,
         repeat: -1,
@@ -900,25 +904,36 @@ function spawnShieldPowerUp() {
     if (unshieldedLandmarks.length === 0) return;
     
     const targetLandmark = Phaser.Utils.Array.GetRandom(unshieldedLandmarks);
-    const offsetX = Phaser.Math.Between(-50, 50);
-    const offsetY = Phaser.Math.Between(-50, 50);
     
-    const shieldPowerUp = powerUps.create(
-        targetLandmark.x + offsetX, 
-        targetLandmark.y + offsetY, 
-        'shield'
-    );
+    // Calculate shield position relative to landmark's map coordinates
+    const landmarkMapX = targetLandmark.originalMapX || targetLandmark.landmarkData.x;
+    const landmarkMapY = targetLandmark.originalMapY || targetLandmark.landmarkData.y;
+    const offsetMapX = Phaser.Math.Between(-50, 50) / game.scene.getScene('default').mapScale;
+    const offsetMapY = Phaser.Math.Between(-50, 50) / game.scene.getScene('default').mapScale;
     
-    // Store original map coordinates for fullscreen recalculation
-    const shieldScene = game.scene.getScene('default');
-    shieldPowerUp.originalX = (shieldPowerUp.x - shieldScene.mapOffsetX) / shieldScene.mapScale;
-    shieldPowerUp.originalY = (shieldPowerUp.y - shieldScene.mapOffsetY) / shieldScene.mapScale;
+    const shieldMapX = landmarkMapX + offsetMapX;
+    const shieldMapY = landmarkMapY + offsetMapY;
+    
+    // Convert to screen coordinates
+    const screenPos = coordinateManager.mapToScreen(shieldMapX, shieldMapY);
+    const shieldPowerUp = powerUps.create(screenPos.x, screenPos.y, 'shield');
+    
+    // Store original map coordinates for coordinate manager tracking
+    shieldPowerUp.originalMapX = shieldMapX;
+    shieldPowerUp.originalMapY = shieldMapY;
     
     // Scale shield power-up proportionally to map scale, smaller in portrait mode
-    const isPortrait = shieldScene.scale.height > shieldScene.scale.width;
-    const portraitReduction = isPortrait ? 0.7 : 1.0; // 30% smaller in portrait
-    const shieldScale = 0.1 * Math.max(0.6, shieldScene.mapScale) * portraitReduction;
+    const shieldScene = game.scene.getScene('default');
+    const isPortraitShield = shieldScene.scale.height > shieldScene.scale.width;
+    const portraitReductionShield = isPortraitShield ? 0.7 : 1.0; // 30% smaller in portrait
+    const shieldScale = 0.1 * Math.max(0.6, shieldScene.mapScale) * portraitReductionShield;
     shieldPowerUp.setScale(shieldScale);
+    
+    // Track shield power-up with mobile handler
+    mobileHandler.addElementToTrack(shieldPowerUp, 'powerUp', {
+        mapX: shieldMapX,
+        mapY: shieldMapY
+    });
     
     // Set collision box based on the scaled shield power-up size
     if (shieldPowerUp.body) {
