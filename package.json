@@ -1,0 +1,28 @@
+{
+  "name": "dr-boogie-mikkeli-game",
+  "version": "1.0.0",
+  "description": "Dr Boogie vs. The Catastrophes of Mikkeli - A browser-based mobile game",
+  "homepage": "https://your-username.github.io/dr-boogie-game",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/dr-boogie-game.git"
+  },
+  "keywords": [
+    "game",
+    "phaser",
+    "mobile",
+    "html5",
+    "javascript",
+    "mikkeli",
+    "tempus-fugit"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "scripts": {
+    "start": "python -m http.server 8000",
+    "serve": "python -m http.server 8000",
+    "deploy": "echo 'Use deploy.ps1 or deploy.sh script'"
+  },
+  "devDependencies": {},
+  "dependencies": {}
+}

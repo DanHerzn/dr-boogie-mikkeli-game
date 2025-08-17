@@ -1,0 +1,35 @@
+# Netlify Deployment Configuration
+# This file tells Netlify how to build and deploy your site
+
+[build]
+  # Since this is a static site, no build command needed
+  publish = "."
+  
+[build.environment]
+  # Environment variables (optional)
+  NODE_VERSION = "18"
+
+# Redirect rules for single-page application
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Headers for security and performance
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+[[headers]]
+  for = "/*.js"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000"
+
+[[headers]]
+  for = "/*.css"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000"

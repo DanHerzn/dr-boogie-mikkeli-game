@@ -1,0 +1,74 @@
+
+# Dr Boogie Game - Hosting & QR Code Setup Guide
+
+## Quick Setup Options
+
+### 1. Local Network Access (Immediate)
+Your game is currently running at:
+- Local: http://localhost:8002
+- Network: http://192.168.1.71:8002 (use this for mobile devices on same WiFi)
+
+Share the network IP with mobile devices on the same WiFi network.
+
+### 2. Cloud Hosting (Recommended for Public Access)
+
+#### Option A: Railway (Easy, Free)
+1. Push your code to GitHub
+2. Go to railway.app
+3. Connect your GitHub repository
+4. Deploy automatically
+5. Get a public URL like: https://your-game-name.up.railway.app
+
+#### Option B: Render (Free)
+1. Push your code to GitHub
+2. Go to render.com
+3. Create new Web Service
+4. Connect GitHub repo
+5. Use these settings:
+   - Build Command: pip install -r requirements.txt
+   - Start Command: gunicorn app:app
+6. Get URL like: https://your-game-name.onrender.com
+
+#### Option C: Heroku (Free tier ended, but still popular)
+1. Install Heroku CLI
+2. Run: heroku create your-game-name
+3. Run: git push heroku main
+4. Get URL like: https://your-game-name.herokuapp.com
+
+#### Option D: Netlify (For frontend-only version)
+If you want to use the original Firebase version:
+1. Remove app.py and backend files
+2. Drag folder to netlify.com
+3. Configure Firebase for database
+
+### 3. Custom Domain (Optional)
+After deploying to any service above:
+1. Buy a domain (e.g., namecheap.com, godaddy.com)
+2. Point it to your hosting service
+3. Update QR code with your custom domain
+
+## Updating QR Code
+1. Deploy your game to chosen hosting service
+2. Get the public URL
+3. Run this script with your URL:
+   python qr_generator.py --url "https://your-actual-url.com"
+
+## Mobile Access Tips
+- Make sure mobile devices can access the URL
+- Test on different devices and browsers
+- For local network: ensure all devices are on same WiFi
+- For cloud hosting: URL works anywhere with internet
+
+## Security Notes
+- The included SQLite database is for development
+- For production, consider PostgreSQL
+- Set proper environment variables
+- Enable HTTPS for production
+
+## Troubleshooting
+- If QR code doesn't work: verify URL is accessible
+- If mobile issues: check responsive design
+- If database issues: check file permissions
+- If deployment fails: check logs in hosting service
+
+Good luck with your game deployment! 🎮

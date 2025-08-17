@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dr Boogie vs. The Catastrophes of Mikkeli</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+    <div id="gameContainer">
+        <!-- Start Screen -->
+        <div id="startScreen" class="screen active">
+            <div class="title">
+                <h1>Dr Boogie vs.</h1>
+                <h2>The Catastrophes of Mikkeli</h2>
+            </div>
+            <div class="character-preview">
+                <img src="Dr" alt="Dr Boogie" class="dr-boogie-img" />
+            </div>
+            <div class="form-container">
+                <input type="text" id="teamName" placeholder="Enter your team name" maxlength="20">
+                <div class="difficulty-selector">
+                    <label for="difficulty">Difficulty:</label>
+                    <select id="difficulty">
+                        <option value="easy">Easy</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="hard">Hard</option>
+                    </select>
+                </div>
+                <button id="startButton">Start Game</button>
+            </div>
+            <div class="instructions">
+                <p>Tap/swipe to move Dr Boogie around Mikkeli and save landmarks from disasters!</p>
+                <p>Save all 13 landmarks across the map before disasters destroy them!</p>
+                <p>You have 60 seconds to score as many points as possible.</p>
+            </div>
+        </div>
+
+        <!-- Game Screen -->
+        <div id="gameScreen" class="screen">
+            <div id="gameUI">
+                <div class="ui-top">
+                    <div class="timer">Time: <span id="timeLeft">60</span>s</div>
+                    <div class="score">Score: <span id="currentScore">0</span></div>
+                </div>
+            </div>
+            <div id="gameCanvas"></div>
+        </div>
+
+        <!-- End Screen -->
+        <div id="endScreen" class="screen">
+            <div class="game-over">
+                <h2>Game Over!</h2>
+                <div class="final-score">
+                    <p>Team: <span id="finalTeamName"></span></p>
+                    <p>Final Score: <span id="finalScore">0</span></p>
+                    <p>Landmarks Saved: <span id="landmarksSaved">0</span></p>
+                </div>
+                <div class="result-message">
+                    <p id="resultMessage"></p>
+                </div>
+                <button id="playAgainButton">Play Again</button>
+                <button id="viewLeaderboardButton">View Leaderboard</button>
+            </div>
+        </div>
+
+        <!-- Leaderboard Screen -->
+        <div id="leaderboardScreen" class="screen">
+            <div class="leaderboard">
+                <h2>Leaderboard</h2>
+                <div id="leaderboardList">
+                    <div class="loading">Loading scores...</div>
+                </div>
+                <button id="backToMenuButton">Back to Menu</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+    <script src="ui.js"></script>
+</body>
+</html>
