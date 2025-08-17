@@ -164,29 +164,29 @@ function create() {
     const screenHeight = this.scale.height;
     
     // Calculate scale to ensure map fits properly in all orientations
-    // Reserve space for UI elements (about 80px on top for mobile)
-    const uiReservedSpace = 80;
+    // Reserve space for UI elements (about 60px on top for mobile)
+    const uiReservedSpace = 60;
     const availableHeight = screenHeight - uiReservedSpace;
     
     const scaleX = screenWidth / mapSprite.width;
     const scaleY = availableHeight / mapSprite.height;
     
-    // Use the smaller scale to ensure the map fits completely
+    // Always use the smaller scale to ensure the map fits completely (no overflow)
     let scale = Math.min(scaleX, scaleY);
     
-    // For mobile devices, ensure minimum visibility
+    // For mobile devices, ensure reasonable minimum and maximum scales
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
                      ('ontouchstart' in window) || 
                      (navigator.maxTouchPoints > 0);
     
     if (isMobile) {
-        // In portrait mode, make sure map isn't too small
-        if (screenHeight > screenWidth && scale < 0.4) {
-            scale = 0.4;
+        // Ensure map isn't too small (minimum 30% scale)
+        if (scale < 0.3) {
+            scale = 0.3;
         }
-        // In landscape mode, ensure it fits well
-        else if (screenWidth > screenHeight && scale < 0.6) {
-            scale = Math.min(0.8, scaleX * 0.9); // Allow slight horizontal overflow if needed
+        // Ensure map doesn't get too big (maximum 85% of available space)
+        else if (scale > 0.85) {
+            scale = 0.85;
         }
     }
     
@@ -222,7 +222,9 @@ function create() {
     );
     
     player.setCollideWorldBounds(true);
-    player.setScale(0.15); // Made Dr Boogie smaller (was 0.3)
+    // Scale player proportionally to map scale (base size 0.15, adjusted by map scale)
+    const playerScale = 0.15 * Math.max(0.6, this.mapScale); // Minimum 60% of base scale
+    player.setScale(playerScale);
     player.body.setSize(player.width * 0.8, player.height * 0.8); // Adjust collision box
 
     // Create landmarks as invisible collision areas with dot overlays
@@ -238,7 +240,9 @@ function create() {
     landmark.setImmovable(true);
     landmark.landmarkData = landmarkInfo;
     landmark.setVisible(false); // Make it invisible
-    landmark.body.setCircle(40); // 40px radius circle, centered
+    // Scale collision area with map scale (base 40px radius)
+    const landmarkRadius = Math.max(20, 40 * this.mapScale);
+    landmark.body.setCircle(landmarkRadius); // Scaled radius circle, centered
     landmark.body.setOffset(0, 0); // No offset needed for circle collision
     landmark.scene = this; // Store scene reference
     landmarks.add(landmark);
@@ -455,13 +459,16 @@ function spawnDisaster() {
         disaster.setVelocity(velocityX, velocityY);
     }
     
-    // Scale disaster images to appropriate size
+    // Scale disaster images proportionally to map scale
+    const gameScene = game.scene.getScene('default');
+    const scaleMultiplier = Math.max(0.5, gameScene.mapScale); // Minimum 50% of base scale
+    
     if (type === 'meteor') {
-        disaster.setScale(0.2); // Made meteors bigger (was 0.1)
+        disaster.setScale(0.2 * scaleMultiplier);
     } else if (type === 'storm') {
-        disaster.setScale(0.15); // Scale storm image appropriately
+        disaster.setScale(0.15 * scaleMultiplier);
     } else if (type === 'flood') {
-        disaster.setScale(0.2); // Made flood image smaller (was 0.8)
+        disaster.setScale(0.2 * scaleMultiplier);
     }
     
     // Add some random movement for more dynamic disasters
@@ -504,15 +511,16 @@ function saveLandmark(player, landmark) {
     
     // Visual feedback
     const scene = landmark.scene;
-    const text = scene.add.text(landmark.x, landmark.y - 30, 'SAVED! +50', {
-        fontSize: '20px',
+    const textScale = Math.max(0.6, scene.mapScale);
+    const text = scene.add.text(landmark.x, landmark.y - 30 * textScale, 'SAVED! +50', {
+        fontSize: `${20 * textScale}px`,
         fill: '#00FF00',
         fontStyle: 'bold'
     });
     
     scene.tweens.add({
         targets: text,
-        y: text.y - 50,
+        y: text.y - 50 * textScale,
         alpha: 0,
         duration: 1000,
         onComplete: () => text.destroy()
@@ -525,15 +533,16 @@ function blockDisaster(player, disaster) {
     
     // Visual feedback for blocked disaster
     const scene = player.scene;
-    const text = scene.add.text(player.x, player.y - 30, 'BLOCKED! +10', {
-        fontSize: '16px',
+    const textScale = Math.max(0.6, scene.mapScale);
+    const text = scene.add.text(player.x, player.y - 30 * textScale, 'BLOCKED! +10', {
+        fontSize: `${16 * textScale}px`,
         fill: '#00FF00',
         fontStyle: 'bold'
     });
     
     scene.tweens.add({
         targets: text,
-        y: text.y - 50,
+        y: text.y - 50 * textScale,
         alpha: 0,
         duration: 1500,
         onComplete: () => text.destroy()
@@ -557,15 +566,16 @@ function destroyLandmark(landmark, disaster) {
         
         // Visual feedback for shield absorption
         const scene = landmark.scene;
-        const text = scene.add.text(landmark.x, landmark.y - 30, 'SHIELD BLOCKED!', {
-            fontSize: '14px',
+        const textScale = Math.max(0.6, scene.mapScale);
+        const text = scene.add.text(landmark.x, landmark.y - 30 * textScale, 'SHIELD BLOCKED!', {
+            fontSize: `${14 * textScale}px`,
             fill: '#FFD700',
             fontStyle: 'bold'
         });
         
         scene.tweens.add({
             targets: text,
-            y: text.y - 50,
+            y: text.y - 50 * textScale,
             alpha: 0,
             duration: 1500,
             onComplete: () => text.destroy()
@@ -591,15 +601,16 @@ function destroyLandmark(landmark, disaster) {
     
     // Visual feedback for failed protection
     const scene = landmark.scene;
-    const text = scene.add.text(landmark.x, landmark.y - 30, 'DESTROYED! -20', {
-        fontSize: '16px',
+    const textScale = Math.max(0.6, scene.mapScale);
+    const text = scene.add.text(landmark.x, landmark.y - 30 * textScale, 'DESTROYED! -20', {
+        fontSize: `${16 * textScale}px`,
         fill: '#FF0000',
         fontStyle: 'bold'
     });
     
     scene.tweens.add({
         targets: text,
-        y: text.y - 50,
+        y: text.y - 50 * textScale,
         alpha: 0,
         duration: 1500,
         onComplete: () => text.destroy()
@@ -693,7 +704,10 @@ function spawnFreezePowerUp() {
     const y = Phaser.Math.Between(mapTop, mapBottom);
     
     const freezePowerUp = powerUps.create(x, y, 'freeze');
-    freezePowerUp.setScale(0.12); // Made bigger (was 0.08)
+    // Scale power-up proportionally to map scale
+    const gameScene = game.scene.getScene('default');
+    const powerUpScale = 0.12 * Math.max(0.6, gameScene.mapScale);
+    freezePowerUp.setScale(powerUpScale);
     freezePowerUp.powerType = 'freeze';
     freezePowerUp.spawnTime = Date.now();
     
@@ -734,7 +748,10 @@ function spawnShieldPowerUp() {
         targetLandmark.y + offsetY, 
         'shield'
     );
-    shieldPowerUp.setScale(0.1); // Made bigger (was 0.06)
+    // Scale shield power-up proportionally to map scale
+    const gameScene = game.scene.getScene('default');
+    const shieldScale = 0.1 * Math.max(0.6, gameScene.mapScale);
+    shieldPowerUp.setScale(shieldScale);
     shieldPowerUp.powerType = 'shield';
     shieldPowerUp.targetLandmark = targetLandmark;
     shieldPowerUp.spawnTime = Date.now();
@@ -757,15 +774,16 @@ function collectPowerUp(player, powerUp) {
         
         // Visual feedback
         const scene = player.scene;
-        const text = scene.add.text(powerUp.x, powerUp.y - 30, 'TIME FREEZE!', {
-            fontSize: '18px',
+        const textScale = Math.max(0.6, scene.mapScale);
+        const text = scene.add.text(powerUp.x, powerUp.y - 30 * textScale, 'TIME FREEZE!', {
+            fontSize: `${18 * textScale}px`,
             fill: '#00FFFF',
             fontStyle: 'bold'
         });
         
         scene.tweens.add({
             targets: text,
-            y: text.y - 50,
+            y: text.y - 50 * textScale,
             alpha: 0,
             duration: 2000,
             onComplete: () => text.destroy()
@@ -778,15 +796,16 @@ function collectPowerUp(player, powerUp) {
             
             // Visual feedback
             const scene = player.scene;
-            const text = scene.add.text(powerUp.x, powerUp.y - 30, 'SHIELD ACTIVE!', {
-                fontSize: '16px',
+            const textScale = Math.max(0.6, scene.mapScale);
+            const text = scene.add.text(powerUp.x, powerUp.y - 30 * textScale, 'SHIELD ACTIVE!', {
+                fontSize: `${16 * textScale}px`,
                 fill: '#FFD700',
                 fontStyle: 'bold'
             });
             
             scene.tweens.add({
                 targets: text,
-                y: text.y - 50,
+                y: text.y - 50 * textScale,
                 alpha: 0,
                 duration: 2000,
                 onComplete: () => text.destroy()
