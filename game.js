@@ -18,7 +18,9 @@ const config = {
     },
     scale: {
         mode: Phaser.Scale.RESIZE,
-        autoCenter: Phaser.Scale.CENTER_BOTH
+        autoCenter: Phaser.Scale.CENTER_BOTH,
+        width: window.innerWidth,
+        height: window.innerHeight
     }
 };
 
@@ -157,25 +159,68 @@ function create() {
     const mapSprite = this.add.image(0, 0, 'mikkeliMap');
     mapSprite.setOrigin(0, 0);
     
-    // Scale the map to fit the screen while maintaining aspect ratio
-    const scaleX = this.scale.width / mapSprite.width;
-    const scaleY = this.scale.height / mapSprite.height;
-    const scale = Math.min(scaleX, scaleY);
+    // Get actual screen dimensions
+    const screenWidth = this.scale.width;
+    const screenHeight = this.scale.height;
+    
+    // Calculate scale to ensure map fits properly in all orientations
+    // Reserve space for UI elements (about 80px on top for mobile)
+    const uiReservedSpace = 80;
+    const availableHeight = screenHeight - uiReservedSpace;
+    
+    const scaleX = screenWidth / mapSprite.width;
+    const scaleY = availableHeight / mapSprite.height;
+    
+    // Use the smaller scale to ensure the map fits completely
+    let scale = Math.min(scaleX, scaleY);
+    
+    // For mobile devices, ensure minimum visibility
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                     ('ontouchstart' in window) || 
+                     (navigator.maxTouchPoints > 0);
+    
+    if (isMobile) {
+        // In portrait mode, make sure map isn't too small
+        if (screenHeight > screenWidth && scale < 0.4) {
+            scale = 0.4;
+        }
+        // In landscape mode, ensure it fits well
+        else if (screenWidth > screenHeight && scale < 0.6) {
+            scale = Math.min(0.8, scaleX * 0.9); // Allow slight horizontal overflow if needed
+        }
+    }
+    
     mapSprite.setScale(scale);
     
-    // Center the map
-    mapSprite.x = (this.scale.width - mapSprite.displayWidth) / 2;
-    mapSprite.y = (this.scale.height - mapSprite.displayHeight) / 2;
+    // Center the map properly
+    mapSprite.x = (screenWidth - mapSprite.displayWidth) / 2;
+    mapSprite.y = uiReservedSpace + (availableHeight - mapSprite.displayHeight) / 2;
     
-    // Store map transform for landmark positioning
+    // Ensure map doesn't go above UI area
+    if (mapSprite.y < uiReservedSpace) {
+        mapSprite.y = uiReservedSpace;
+    }
+    
+    // Store map transform for landmark positioning and bounds
     this.mapScale = scale;
     this.mapOffsetX = mapSprite.x;
     this.mapOffsetY = mapSprite.y;
+    this.mapWidth = mapSprite.displayWidth;
+    this.mapHeight = mapSprite.displayHeight;
 
-    // Create player (Dr Boogie) - can now move freely anywhere on the map
-    const startX = this.mapOffsetX + (200 * this.mapScale);
-    const startY = this.mapOffsetY + (300 * this.mapScale);
+    // Create player (Dr Boogie) - start in center of map
+    const startX = this.mapOffsetX + (this.mapWidth / 2);
+    const startY = this.mapOffsetY + (this.mapHeight / 2);
     player = this.physics.add.sprite(startX, startY, 'drBoogie');
+    
+    // Set world bounds to map area instead of screen
+    this.physics.world.setBounds(
+        this.mapOffsetX, 
+        this.mapOffsetY, 
+        this.mapWidth, 
+        this.mapHeight
+    );
+    
     player.setCollideWorldBounds(true);
     player.setScale(0.15); // Made Dr Boogie smaller (was 0.3)
     player.body.setSize(player.width * 0.8, player.height * 0.8); // Adjust collision box
@@ -328,9 +373,16 @@ function update() {
     // Update disasters
     disasters.children.entries.forEach(disaster => {
         if (disaster.active) {
-            // Remove disasters that go off screen
-            if (disaster.x < -50 || disaster.x > game.scale.width + 50 || 
-                disaster.y < -50 || disaster.y > game.scale.height + 50) {
+            // Get map boundaries for cleanup
+            const scene = disaster.scene;
+            const mapLeft = scene.mapOffsetX - 100; // Cleanup margin
+            const mapRight = scene.mapOffsetX + scene.mapWidth + 100;
+            const mapTop = scene.mapOffsetY - 100;
+            const mapBottom = scene.mapOffsetY + scene.mapHeight + 100;
+            
+            // Remove disasters that go too far from map area
+            if (disaster.x < mapLeft || disaster.x > mapRight || 
+                disaster.y < mapTop || disaster.y > mapBottom) {
                 disaster.destroy();
             }
         }
@@ -354,30 +406,37 @@ function spawnDisaster() {
     const disasterTypes = ['meteor', 'flood', 'storm'];
     const type = Phaser.Utils.Array.GetRandom(disasterTypes);
     
-    // Random spawn position from screen edges
+    // Get map boundaries for proper disaster spawning
+    const scene = game.scene.getScene('default');
+    const mapLeft = scene.mapOffsetX;
+    const mapRight = scene.mapOffsetX + scene.mapWidth;
+    const mapTop = scene.mapOffsetY;
+    const mapBottom = scene.mapOffsetY + scene.mapHeight;
+    
+    // Spawn disasters from edges of the map area (not screen edges)
     let x, y, velocityX = 0, velocityY = 0;
     const speedMultiplier = difficultySettings[difficulty].disasterSpeed;
     
     const side = Phaser.Math.Between(0, 3);
     switch (side) {
-        case 0: // Top
-            x = Phaser.Math.Between(0, game.scale.width);
-            y = -50;
+        case 0: // Top edge of map
+            x = Phaser.Math.Between(mapLeft, mapRight);
+            y = mapTop - 50;
             velocityY = Phaser.Math.Between(80, 200) * speedMultiplier;
             break;
-        case 1: // Right
-            x = game.scale.width + 50;
-            y = Phaser.Math.Between(0, game.scale.height);
+        case 1: // Right edge of map
+            x = mapRight + 50;
+            y = Phaser.Math.Between(mapTop, mapBottom);
             velocityX = Phaser.Math.Between(-200, -80) * speedMultiplier;
             break;
-        case 2: // Bottom
-            x = Phaser.Math.Between(0, game.scale.width);
-            y = game.scale.height + 50;
+        case 2: // Bottom edge of map
+            x = Phaser.Math.Between(mapLeft, mapRight);
+            y = mapBottom + 50;
             velocityY = Phaser.Math.Between(-200, -80) * speedMultiplier;
             break;
-        case 3: // Left
-            x = -50;
-            y = Phaser.Math.Between(0, game.scale.height);
+        case 3: // Left edge of map
+            x = mapLeft - 50;
+            y = Phaser.Math.Between(mapTop, mapBottom);
             velocityX = Phaser.Math.Between(80, 200) * speedMultiplier;
             break;
     }
@@ -622,10 +681,16 @@ function spawnFreezePowerUp() {
     if (Date.now() - lastFreezeSpawn < 10000) return; // 10 second cooldown
     lastFreezeSpawn = Date.now();
     
-    // Random position on map (avoid edges)
-    const margin = 100;
-    const x = Phaser.Math.Between(margin, game.scale.width - margin);
-    const y = Phaser.Math.Between(margin, game.scale.height - margin);
+    // Get map boundaries for proper power-up spawning
+    const scene = game.scene.getScene('default');
+    const mapLeft = scene.mapOffsetX + 50; // Add margin from edges
+    const mapRight = scene.mapOffsetX + scene.mapWidth - 50;
+    const mapTop = scene.mapOffsetY + 50;
+    const mapBottom = scene.mapOffsetY + scene.mapHeight - 50;
+    
+    // Random position within map boundaries
+    const x = Phaser.Math.Between(mapLeft, mapRight);
+    const y = Phaser.Math.Between(mapTop, mapBottom);
     
     const freezePowerUp = powerUps.create(x, y, 'freeze');
     freezePowerUp.setScale(0.12); // Made bigger (was 0.08)
@@ -773,6 +838,21 @@ function endGame() {
 
 function initializeGame() {
     game = new Phaser.Game(config);
+    
+    // Handle screen resize and orientation changes
+    window.addEventListener('resize', () => {
+        if (game && game.scene && game.scene.scenes[0]) {
+            game.scale.resize(window.innerWidth, window.innerHeight);
+        }
+    });
+    
+    window.addEventListener('orientationchange', () => {
+        setTimeout(() => {
+            if (game && game.scene && game.scene.scenes[0]) {
+                game.scale.resize(window.innerWidth, window.innerHeight);
+            }
+        }, 100);
+    });
 }
 
 // Mobile Controls Setup
