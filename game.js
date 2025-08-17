@@ -42,6 +42,14 @@ let freezeTimeLeft = 0;
 let lastFreezeSpawn = 0;
 let lastShieldSpawn = 0;
 
+// Mobile controls variables
+let mobileControls = {
+    up: false,
+    down: false,
+    left: false,
+    right: false
+};
+
 // Difficulty settings
 let difficulty = 'medium'; // 'easy', 'medium', 'hard'
 const difficultySettings = {
@@ -212,16 +220,27 @@ function create() {
     // Input handling
     cursors = this.input.keyboard.createCursorKeys();
     
-    // Touch/Mouse input
+    // Touch/Mouse input (disabled on mobile to use arrow controls instead)
     this.input.on('pointerdown', (pointer) => {
         if (isGameRunning) {
-            const targetX = pointer.x;
-            const targetY = pointer.y;
+            // Check if this is a mobile device
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                           ('ontouchstart' in window) || 
+                           (navigator.maxTouchPoints > 0);
             
-            // Move player towards touch/click position
-            this.physics.moveToObject(player, { x: targetX, y: targetY }, 200);
+            // Only use touch/click movement on desktop
+            if (!isMobile) {
+                const targetX = pointer.x;
+                const targetY = pointer.y;
+                
+                // Move player towards touch/click position
+                this.physics.moveToObject(player, { x: targetX, y: targetY }, 200);
+            }
         }
     });
+
+    // Setup mobile controls
+    setupMobileControls();
 
     // Start spawning disasters (rate depends on difficulty)
     this.time.addEvent({
@@ -289,18 +308,18 @@ function update() {
         }
     }
 
-    // Keyboard controls (for testing)
-    if (cursors.left.isDown) {
+    // Keyboard and mobile controls
+    if (cursors.left.isDown || mobileControls.left) {
         player.setVelocityX(-200);
-    } else if (cursors.right.isDown) {
+    } else if (cursors.right.isDown || mobileControls.right) {
         player.setVelocityX(200);
     } else {
         player.setVelocityX(0);
     }
 
-    if (cursors.up.isDown) {
+    if (cursors.up.isDown || mobileControls.up) {
         player.setVelocityY(-200);
-    } else if (cursors.down.isDown) {
+    } else if (cursors.down.isDown || mobileControls.down) {
         player.setVelocityY(200);
     } else {
         player.setVelocityY(0);
@@ -560,6 +579,12 @@ function startGame() {
     lastFreezeSpawn = 0;
     lastShieldSpawn = 0;
     
+    // Reset mobile controls
+    mobileControls.up = false;
+    mobileControls.down = false;
+    mobileControls.left = false;
+    mobileControls.right = false;
+    
     // Reset landmarks
     landmarkData.forEach(landmark => {
         landmark.saved = false;
@@ -748,6 +773,118 @@ function endGame() {
 
 function initializeGame() {
     game = new Phaser.Game(config);
+}
+
+// Mobile Controls Setup
+function setupMobileControls() {
+    // Show mobile controls on mobile devices
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                     ('ontouchstart' in window) || 
+                     (navigator.maxTouchPoints > 0);
+    
+    if (isMobile) {
+        const mobileControlsElement = document.getElementById('mobileControls');
+        if (mobileControlsElement) {
+            mobileControlsElement.style.display = 'block';
+        }
+    }
+    
+    // Add event listeners for arrow buttons
+    const upArrow = document.getElementById('upArrow');
+    const downArrow = document.getElementById('downArrow');
+    const leftArrow = document.getElementById('leftArrow');
+    const rightArrow = document.getElementById('rightArrow');
+    
+    if (upArrow) {
+        upArrow.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            mobileControls.up = true;
+        });
+        upArrow.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            mobileControls.up = false;
+        });
+        upArrow.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            mobileControls.up = true;
+        });
+        upArrow.addEventListener('mouseup', (e) => {
+            e.preventDefault();
+            mobileControls.up = false;
+        });
+    }
+    
+    if (downArrow) {
+        downArrow.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            mobileControls.down = true;
+        });
+        downArrow.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            mobileControls.down = false;
+        });
+        downArrow.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            mobileControls.down = true;
+        });
+        downArrow.addEventListener('mouseup', (e) => {
+            e.preventDefault();
+            mobileControls.down = false;
+        });
+    }
+    
+    if (leftArrow) {
+        leftArrow.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            mobileControls.left = true;
+        });
+        leftArrow.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            mobileControls.left = false;
+        });
+        leftArrow.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            mobileControls.left = true;
+        });
+        leftArrow.addEventListener('mouseup', (e) => {
+            e.preventDefault();
+            mobileControls.left = false;
+        });
+    }
+    
+    if (rightArrow) {
+        rightArrow.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            mobileControls.right = true;
+        });
+        rightArrow.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            mobileControls.right = false;
+        });
+        rightArrow.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            mobileControls.right = true;
+        });
+        rightArrow.addEventListener('mouseup', (e) => {
+            e.preventDefault();
+            mobileControls.right = false;
+        });
+    }
+    
+    // Handle cases where touch/mouse events get stuck
+    document.addEventListener('touchend', () => {
+        mobileControls.up = false;
+        mobileControls.down = false;
+        mobileControls.left = false;
+        mobileControls.right = false;
+    });
+    
+    document.addEventListener('mouseup', () => {
+        mobileControls.up = false;
+        mobileControls.down = false;
+        mobileControls.left = false;
+        mobileControls.right = false;
+    });
 }
 
 // Initialize when page loads

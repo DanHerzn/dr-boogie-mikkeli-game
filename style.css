@@ -383,6 +383,77 @@ body {
     }
 }
 
+/* Mobile Controls */
+.mobile-controls {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1000;
+    display: none; /* Hidden by default, shown via JavaScript for mobile */
+}
+
+.arrow-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+}
+
+.arrow-row {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+}
+
+.arrow-btn {
+    width: 60px;
+    height: 60px;
+    background: rgba(0, 0, 0, 0.7);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    color: white;
+    font-size: 24px;
+    font-weight: bold;
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: manipulation;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.1s ease;
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+}
+
+.arrow-btn:hover,
+.arrow-btn:active {
+    background: rgba(0, 123, 255, 0.8);
+    border-color: rgba(255, 255, 255, 0.6);
+    transform: scale(0.95);
+}
+
+.arrow-btn:active {
+    background: rgba(0, 123, 255, 1);
+}
+
+/* Mobile layout adjustments */
+@media (max-width: 768px) {
+    .mobile-controls {
+        display: block;
+    }
+    
+    /* Adjust UI for mobile with controls */
+    .ui-top {
+        padding: 10px 15px;
+    }
+    
+    .timer, .score {
+        font-size: 1rem;
+        padding: 8px 15px;
+    }
+}
+
 /* Landscape Mobile */
 @media (max-height: 500px) and (orientation: landscape) {
     .title h1 {
