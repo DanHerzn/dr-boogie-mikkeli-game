@@ -490,8 +490,8 @@ body {
 
 .arrow-controls {
     position: relative;
-    width: 140px;
-    height: 140px;
+    width: 180px;
+    height: 120px;
 }
 
 .arrow-row.top {
@@ -508,13 +508,7 @@ body {
     right: 0;
     display: flex;
     justify-content: space-between;
-}
-
-.arrow-row.center {
-    position: absolute;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
+    align-items: center;
 }
 
 .arrow-btn {

@@ -185,9 +185,15 @@ function create() {
                      (navigator.maxTouchPoints > 0);
     
     if (isFullscreen) {
-        // In fullscreen mode, maximize map usage (98% of screen)
-        scale = scale * 0.98;
-        console.log('Fullscreen mode: using 98% scale');
+        // In fullscreen mode, different behavior for mobile vs desktop
+        if (isMobile) {
+            // Mobile fullscreen: use 98% of screen
+            scale = scale * 0.98;
+        } else {
+            // Desktop fullscreen: use 100% (maximum scale while maintaining aspect ratio)
+            scale = scale * 1.0;
+        }
+        console.log(`Fullscreen mode: using ${isMobile ? '98%' : '100%'} scale for ${isMobile ? 'mobile' : 'desktop'}`);
     } else if (isMobile) {
         if (isLandscape) {
             // In landscape mode, use more of the available space for better map visibility
@@ -249,7 +255,16 @@ function create() {
     const portraitReduction = isPortrait ? 0.5 : 1.0; // 50% smaller in portrait (was 30%)
     const playerScale = 0.15 * Math.max(0.6, this.mapScale) * portraitReduction;
     player.setScale(playerScale);
-    player.body.setSize(player.width * 0.8, player.height * 0.8); // Adjust collision box
+    
+    // Set collision box size based on the scaled player size
+    const scaledPlayerWidth = player.width * playerScale;
+    const scaledPlayerHeight = player.height * playerScale;
+    player.body.setSize(scaledPlayerWidth * 0.8, scaledPlayerHeight * 0.8);
+    // Center the collision box properly
+    player.body.setOffset(
+        (player.width - scaledPlayerWidth * 0.8) / 2,
+        (player.height - scaledPlayerHeight * 0.8) / 2
+    );
 
     // Create landmarks as invisible collision areas with dot overlays
     landmarks = this.physics.add.group();
@@ -494,12 +509,27 @@ function spawnDisaster() {
     const portraitReduction = isPortrait ? 0.7 : 1.0; // 30% smaller in portrait
     const scaleMultiplier = Math.max(0.5, sceneForScale.mapScale) * portraitReduction;
     
+    let disasterScale;
     if (type === 'meteor') {
-        disaster.setScale(0.2 * scaleMultiplier);
+        disasterScale = 0.2 * scaleMultiplier;
+        disaster.setScale(disasterScale);
     } else if (type === 'storm') {
-        disaster.setScale(0.15 * scaleMultiplier);
+        disasterScale = 0.15 * scaleMultiplier;
+        disaster.setScale(disasterScale);
     } else if (type === 'flood') {
-        disaster.setScale(0.2 * scaleMultiplier);
+        disasterScale = 0.2 * scaleMultiplier;
+        disaster.setScale(disasterScale);
+    }
+    
+    // Set collision box based on the scaled disaster size
+    if (disaster.body) {
+        const scaledDisasterWidth = disaster.width * disasterScale;
+        const scaledDisasterHeight = disaster.height * disasterScale;
+        disaster.body.setSize(scaledDisasterWidth * 0.8, scaledDisasterHeight * 0.8);
+        disaster.body.setOffset(
+            (disaster.width - scaledDisasterWidth * 0.8) / 2,
+            (disaster.height - scaledDisasterHeight * 0.8) / 2
+        );
     }
     
     // Add some random movement for more dynamic disasters
@@ -543,11 +573,30 @@ function saveLandmark(player, landmark) {
     // Visual feedback
     const scene = landmark.scene;
     const textScale = Math.max(0.6, scene.mapScale);
-    const text = scene.add.text(landmark.x, landmark.y - 30 * textScale, 'SAVED! +50', {
+    
+    // Detect if mobile for enhanced text visibility
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                     ('ontouchstart' in window) || 
+                     (navigator.maxTouchPoints > 0);
+    
+    const textStyle = {
         fontSize: `${20 * textScale}px`,
         fill: '#00FF00',
-        fontStyle: 'bold'
-    });
+        fontStyle: 'bold',
+        fontFamily: 'Arial, sans-serif'
+    };
+    
+    // Add stronger outline for mobile visibility
+    if (isMobile) {
+        textStyle.stroke = '#000000';
+        textStyle.strokeThickness = 4;
+        textStyle.fontWeight = '900'; // Extra bold for mobile
+    } else {
+        textStyle.stroke = '#000000';
+        textStyle.strokeThickness = 2;
+    }
+    
+    const text = scene.add.text(landmark.x, landmark.y - 30 * textScale, 'SAVED! +50', textStyle);
     
     scene.tweens.add({
         targets: text,
@@ -565,11 +614,30 @@ function blockDisaster(player, disaster) {
     // Visual feedback for blocked disaster
     const scene = player.scene;
     const textScale = Math.max(0.6, scene.mapScale);
-    const text = scene.add.text(player.x, player.y - 30 * textScale, 'BLOCKED! +10', {
+    
+    // Detect if mobile for enhanced text visibility
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                     ('ontouchstart' in window) || 
+                     (navigator.maxTouchPoints > 0);
+    
+    const textStyle = {
         fontSize: `${16 * textScale}px`,
         fill: '#00FF00',
-        fontStyle: 'bold'
-    });
+        fontStyle: 'bold',
+        fontFamily: 'Arial, sans-serif'
+    };
+    
+    // Add stronger outline for mobile visibility
+    if (isMobile) {
+        textStyle.stroke = '#000000';
+        textStyle.strokeThickness = 4;
+        textStyle.fontWeight = '900'; // Extra bold for mobile
+    } else {
+        textStyle.stroke = '#000000';
+        textStyle.strokeThickness = 2;
+    }
+    
+    const text = scene.add.text(player.x, player.y - 30 * textScale, 'BLOCKED! +10', textStyle);
     
     scene.tweens.add({
         targets: text,
@@ -598,11 +666,30 @@ function destroyLandmark(landmark, disaster) {
         // Visual feedback for shield absorption
         const scene = landmark.scene;
         const textScale = Math.max(0.6, scene.mapScale);
-        const text = scene.add.text(landmark.x, landmark.y - 30 * textScale, 'SHIELD BLOCKED!', {
+        
+        // Detect if mobile for enhanced text visibility
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                         ('ontouchstart' in window) || 
+                         (navigator.maxTouchPoints > 0);
+        
+        const textStyle = {
             fontSize: `${14 * textScale}px`,
             fill: '#FFD700',
-            fontStyle: 'bold'
-        });
+            fontStyle: 'bold',
+            fontFamily: 'Arial, sans-serif'
+        };
+        
+        // Add stronger outline for mobile visibility
+        if (isMobile) {
+            textStyle.stroke = '#000000';
+            textStyle.strokeThickness = 4;
+            textStyle.fontWeight = '900'; // Extra bold for mobile
+        } else {
+            textStyle.stroke = '#000000';
+            textStyle.strokeThickness = 2;
+        }
+        
+        const text = scene.add.text(landmark.x, landmark.y - 30 * textScale, 'SHIELD BLOCKED!', textStyle);
         
         scene.tweens.add({
             targets: text,
@@ -633,11 +720,30 @@ function destroyLandmark(landmark, disaster) {
     // Visual feedback for failed protection
     const scene = landmark.scene;
     const textScale = Math.max(0.6, scene.mapScale);
-    const text = scene.add.text(landmark.x, landmark.y - 30 * textScale, 'DESTROYED! -20', {
+    
+    // Detect if mobile for enhanced text visibility
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                     ('ontouchstart' in window) || 
+                     (navigator.maxTouchPoints > 0);
+    
+    const textStyle = {
         fontSize: `${16 * textScale}px`,
         fill: '#FF0000',
-        fontStyle: 'bold'
-    });
+        fontStyle: 'bold',
+        fontFamily: 'Arial, sans-serif'
+    };
+    
+    // Add stronger outline for mobile visibility
+    if (isMobile) {
+        textStyle.stroke = '#000000';
+        textStyle.strokeThickness = 4;
+        textStyle.fontWeight = '900'; // Extra bold for mobile
+    } else {
+        textStyle.stroke = '#000000';
+        textStyle.strokeThickness = 2;
+    }
+    
+    const text = scene.add.text(landmark.x, landmark.y - 30 * textScale, 'DESTROYED! -20', textStyle);
     
     scene.tweens.add({
         targets: text,
@@ -746,6 +852,18 @@ function spawnFreezePowerUp() {
     const portraitReduction = isPortrait ? 0.7 : 1.0; // 30% smaller in portrait
     const powerUpScale = 0.12 * Math.max(0.6, freezeScene.mapScale) * portraitReduction;
     freezePowerUp.setScale(powerUpScale);
+    
+    // Set collision box based on the scaled power-up size
+    if (freezePowerUp.body) {
+        const scaledPowerUpWidth = freezePowerUp.width * powerUpScale;
+        const scaledPowerUpHeight = freezePowerUp.height * powerUpScale;
+        freezePowerUp.body.setSize(scaledPowerUpWidth, scaledPowerUpHeight);
+        freezePowerUp.body.setOffset(
+            (freezePowerUp.width - scaledPowerUpWidth) / 2,
+            (freezePowerUp.height - scaledPowerUpHeight) / 2
+        );
+    }
+    
     freezePowerUp.powerType = 'freeze';
     freezePowerUp.spawnTime = Date.now();
     
@@ -797,6 +915,18 @@ function spawnShieldPowerUp() {
     const portraitReduction = isPortrait ? 0.7 : 1.0; // 30% smaller in portrait
     const shieldScale = 0.1 * Math.max(0.6, shieldScene.mapScale) * portraitReduction;
     shieldPowerUp.setScale(shieldScale);
+    
+    // Set collision box based on the scaled shield power-up size
+    if (shieldPowerUp.body) {
+        const scaledShieldWidth = shieldPowerUp.width * shieldScale;
+        const scaledShieldHeight = shieldPowerUp.height * shieldScale;
+        shieldPowerUp.body.setSize(scaledShieldWidth, scaledShieldHeight);
+        shieldPowerUp.body.setOffset(
+            (shieldPowerUp.width - scaledShieldWidth) / 2,
+            (shieldPowerUp.height - scaledShieldHeight) / 2
+        );
+    }
+    
     shieldPowerUp.powerType = 'shield';
     shieldPowerUp.targetLandmark = targetLandmark;
     shieldPowerUp.spawnTime = Date.now();
@@ -820,11 +950,30 @@ function collectPowerUp(player, powerUp) {
         // Visual feedback
         const scene = player.scene;
         const textScale = Math.max(0.6, scene.mapScale);
-        const text = scene.add.text(powerUp.x, powerUp.y - 30 * textScale, 'TIME FREEZE!', {
+        
+        // Detect if mobile for enhanced text visibility
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                         ('ontouchstart' in window) || 
+                         (navigator.maxTouchPoints > 0);
+        
+        const textStyle = {
             fontSize: `${18 * textScale}px`,
             fill: '#00FFFF',
-            fontStyle: 'bold'
-        });
+            fontStyle: 'bold',
+            fontFamily: 'Arial, sans-serif'
+        };
+        
+        // Add stronger outline for mobile visibility
+        if (isMobile) {
+            textStyle.stroke = '#000000';
+            textStyle.strokeThickness = 4;
+            textStyle.fontWeight = '900'; // Extra bold for mobile
+        } else {
+            textStyle.stroke = '#000000';
+            textStyle.strokeThickness = 2;
+        }
+        
+        const text = scene.add.text(powerUp.x, powerUp.y - 30 * textScale, 'TIME FREEZE!', textStyle);
         
         scene.tweens.add({
             targets: text,
@@ -842,11 +991,30 @@ function collectPowerUp(player, powerUp) {
             // Visual feedback
             const scene = player.scene;
             const textScale = Math.max(0.6, scene.mapScale);
-            const text = scene.add.text(powerUp.x, powerUp.y - 30 * textScale, 'SHIELD ACTIVE!', {
+            
+            // Detect if mobile for enhanced text visibility
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                             ('ontouchstart' in window) || 
+                             (navigator.maxTouchPoints > 0);
+            
+            const textStyle = {
                 fontSize: `${16 * textScale}px`,
                 fill: '#FFD700',
-                fontStyle: 'bold'
-            });
+                fontStyle: 'bold',
+                fontFamily: 'Arial, sans-serif'
+            };
+            
+            // Add stronger outline for mobile visibility
+            if (isMobile) {
+                textStyle.stroke = '#000000';
+                textStyle.strokeThickness = 4;
+                textStyle.fontWeight = '900'; // Extra bold for mobile
+            } else {
+                textStyle.stroke = '#000000';
+                textStyle.strokeThickness = 2;
+            }
+            
+            const text = scene.add.text(powerUp.x, powerUp.y - 30 * textScale, 'SHIELD ACTIVE!', textStyle);
             
             scene.tweens.add({
                 targets: text,
@@ -997,10 +1165,20 @@ function recalculateMapForFullscreen(scene) {
             // In fullscreen, use maximum possible scale while maintaining aspect ratio
             scale = Math.min(scaleX, scaleY);
             
-            // Use 98% of available space in fullscreen for maximum visibility
-            scale = scale * 0.98;
+            // Detect if mobile for different fullscreen scaling
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                           ('ontouchstart' in window) || 
+                           (navigator.maxTouchPoints > 0);
             
-            console.log(`Fullscreen scale calculated: ${scale}`);
+            if (isMobile) {
+                // Mobile fullscreen: use 98% of available space
+                scale = scale * 0.98;
+            } else {
+                // Desktop fullscreen: use 100% (maximum scale)
+                scale = scale * 1.0;
+            }
+            
+            console.log(`Fullscreen scale calculated: ${scale} for ${isMobile ? 'mobile' : 'desktop'}`);
         } else {
             // Normal scaling logic
             const isLandscape = screenWidth > screenHeight;
@@ -1049,7 +1227,18 @@ function recalculateMapForFullscreen(scene) {
             const portraitReduction = isPortrait ? 0.5 : 1.0;
             const playerScale = 0.15 * Math.max(0.6, scale) * portraitReduction;
             player.setScale(playerScale);
-            player.body.setSize(player.width * 0.8, player.height * 0.8);
+            
+            // Update player collision box to match new scale
+            if (player.body) {
+                const playerWidth = player.width * playerScale;
+                const playerHeight = player.height * playerScale;
+                player.body.setSize(playerWidth * 0.8, playerHeight * 0.8);
+                // Center the collision box
+                player.body.setOffset(
+                    (player.width - playerWidth * 0.8) / 2,
+                    (player.height - playerHeight * 0.8) / 2
+                );
+            }
         }
         
         // Update landmarks positions and scales
@@ -1061,14 +1250,22 @@ function recalculateMapForFullscreen(scene) {
                     
                     landmark.setPosition(screenX, screenY);
                     
-                    // Update collision radius
+                    // Update collision radius and body
                     const landmarkRadius = Math.max(20, 40 * scale);
-                    landmark.body.setCircle(landmarkRadius);
+                    if (landmark.body) {
+                        landmark.body.setCircle(landmarkRadius);
+                        landmark.body.setOffset(0, 0); // Center the circle
+                    }
                     
                     // Update dot overlay position
                     if (landmark.dotOverlay) {
                         landmark.dotOverlay.x = screenX;
                         landmark.dotOverlay.y = screenY;
+                        
+                        // Redraw dot overlay with new scale
+                        const color = landmark.landmarkData.saved ? 
+                            (landmark.landmarkData.destroyed ? 0xFF0000 : 0x00FF00) : 0xFFFF00;
+                        drawDotOverlay(landmark.dotOverlay, color, scale);
                     }
                 }
             });
@@ -1086,6 +1283,17 @@ function recalculateMapForFullscreen(scene) {
                     const portraitReduction = isPortrait ? 0.5 : 1.0;
                     const disasterScale = 0.06 * Math.max(0.7, scale) * portraitReduction;
                     disaster.setScale(disasterScale);
+                    
+                    // Update collision box for disasters
+                    if (disaster.body) {
+                        const disasterWidth = disaster.width * disasterScale;
+                        const disasterHeight = disaster.height * disasterScale;
+                        disaster.body.setSize(disasterWidth * 0.8, disasterHeight * 0.8);
+                        disaster.body.setOffset(
+                            (disaster.width - disasterWidth * 0.8) / 2,
+                            (disaster.height - disasterHeight * 0.8) / 2
+                        );
+                    }
                 }
             });
         }
@@ -1102,6 +1310,17 @@ function recalculateMapForFullscreen(scene) {
                     const portraitReduction = isPortrait ? 0.6 : 1.0;
                     const powerUpScale = 0.08 * Math.max(0.7, scale) * portraitReduction;
                     powerUp.setScale(powerUpScale);
+                    
+                    // Update collision box for power-ups
+                    if (powerUp.body) {
+                        const powerUpWidth = powerUp.width * powerUpScale;
+                        const powerUpHeight = powerUp.height * powerUpScale;
+                        powerUp.body.setSize(powerUpWidth, powerUpHeight);
+                        powerUp.body.setOffset(
+                            (powerUp.width - powerUpWidth) / 2,
+                            (powerUp.height - powerUpHeight) / 2
+                        );
+                    }
                 }
             });
         }
