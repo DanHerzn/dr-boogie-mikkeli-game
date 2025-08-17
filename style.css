@@ -226,6 +226,66 @@ body {
     border: 2px solid rgba(255, 255, 255, 0.2);
 }
 
+.fullscreen-btn {
+    color: white;
+    font-size: 1.4rem;
+    font-weight: bold;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    background: rgba(255, 255, 255, 0.1);
+    padding: 8px 12px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: none; /* Hidden by default, shown on mobile */
+}
+
+.fullscreen-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.1);
+}
+
+.fullscreen-btn:active {
+    transform: scale(0.95);
+}
+
+/* Fullscreen mode optimizations */
+:fullscreen {
+    background: #000;
+}
+
+:fullscreen #gameContainer,
+:-webkit-full-screen #gameContainer,
+:-moz-full-screen #gameContainer,
+:-ms-fullscreen #gameContainer {
+    width: 100vw !important;
+    height: 100vh !important;
+}
+
+:fullscreen .ui-top,
+:-webkit-full-screen .ui-top,
+:-moz-full-screen .ui-top,
+:-ms-fullscreen .ui-top {
+    padding: 3px 8px;
+    background: rgba(0, 0, 0, 0.7);
+}
+
+:fullscreen .timer,
+:fullscreen .score,
+:fullscreen .fullscreen-btn,
+:-webkit-full-screen .timer,
+:-webkit-full-screen .score,
+:-webkit-full-screen .fullscreen-btn,
+:-moz-full-screen .timer,
+:-moz-full-screen .score,
+:-moz-full-screen .fullscreen-btn,
+:-ms-fullscreen .timer,
+:-ms-fullscreen .score,
+:-ms-fullscreen .fullscreen-btn {
+    font-size: 0.9rem;
+    padding: 4px 8px;
+}
+
 #gameCanvas {
     width: 100vw !important;
     height: 100vh !important;
@@ -464,6 +524,13 @@ body {
         font-size: 0.9rem;
         padding: 5px 12px;
         border-radius: 15px;
+    }
+    
+    /* Show fullscreen button on mobile */
+    .fullscreen-btn {
+        display: block;
+        font-size: 1rem;
+        padding: 6px 10px;
     }
     
     /* Ensure game canvas fills viewport properly */

@@ -179,14 +179,32 @@ function create() {
                      ('ontouchstart' in window) || 
                      (navigator.maxTouchPoints > 0);
     
+    // Check if we're in fullscreen mode
+    const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement || 
+                        document.mozFullScreenElement || document.msFullscreenElement;
+    
     if (isMobile) {
-        // Ensure map isn't too small (minimum 30% scale)
-        if (scale < 0.3) {
-            scale = 0.3;
-        }
-        // Ensure map doesn't get too big (maximum 85% of available space)
-        else if (scale > 0.85) {
-            scale = 0.85;
+        if (isFullscreen) {
+            // In fullscreen mode, use more of the available space
+            // Reserve less space for UI
+            const fullscreenUISpace = 40;
+            const fullscreenAvailableHeight = screenHeight - fullscreenUISpace;
+            const fullscreenScaleY = fullscreenAvailableHeight / mapSprite.height;
+            scale = Math.min(scaleX, fullscreenScaleY);
+            
+            // Allow larger scale in fullscreen
+            if (scale > 1.0) {
+                scale = 1.0; // Don't exceed original size
+            }
+        } else {
+            // Normal mobile mode with original limits
+            if (scale < 0.3) {
+                scale = 0.3;
+            }
+            // Ensure map doesn't get too big (maximum 85% of available space)
+            else if (scale > 0.85) {
+                scale = 0.85;
+            }
         }
     }
     
@@ -222,8 +240,10 @@ function create() {
     );
     
     player.setCollideWorldBounds(true);
-    // Scale player proportionally to map scale (base size 0.15, adjusted by map scale)
-    const playerScale = 0.15 * Math.max(0.6, this.mapScale); // Minimum 60% of base scale
+    // Scale player proportionally to map scale, smaller in portrait mode
+    const isPortrait = this.scale.height > this.scale.width;
+    const portraitReduction = isPortrait ? 0.7 : 1.0; // 30% smaller in portrait
+    const playerScale = 0.15 * Math.max(0.6, this.mapScale) * portraitReduction;
     player.setScale(playerScale);
     player.body.setSize(player.width * 0.8, player.height * 0.8); // Adjust collision box
 
@@ -459,9 +479,11 @@ function spawnDisaster() {
         disaster.setVelocity(velocityX, velocityY);
     }
     
-    // Scale disaster images proportionally to map scale
+    // Scale disaster images proportionally to map scale, smaller in portrait mode
     const gameScene = game.scene.getScene('default');
-    const scaleMultiplier = Math.max(0.5, gameScene.mapScale); // Minimum 50% of base scale
+    const isPortrait = gameScene.scale.height > gameScene.scale.width;
+    const portraitReduction = isPortrait ? 0.7 : 1.0; // 30% smaller in portrait
+    const scaleMultiplier = Math.max(0.5, gameScene.mapScale) * portraitReduction;
     
     if (type === 'meteor') {
         disaster.setScale(0.2 * scaleMultiplier);
@@ -704,9 +726,11 @@ function spawnFreezePowerUp() {
     const y = Phaser.Math.Between(mapTop, mapBottom);
     
     const freezePowerUp = powerUps.create(x, y, 'freeze');
-    // Scale power-up proportionally to map scale
+    // Scale power-up proportionally to map scale, smaller in portrait mode
     const gameScene = game.scene.getScene('default');
-    const powerUpScale = 0.12 * Math.max(0.6, gameScene.mapScale);
+    const isPortrait = gameScene.scale.height > gameScene.scale.width;
+    const portraitReduction = isPortrait ? 0.7 : 1.0; // 30% smaller in portrait
+    const powerUpScale = 0.12 * Math.max(0.6, gameScene.mapScale) * portraitReduction;
     freezePowerUp.setScale(powerUpScale);
     freezePowerUp.powerType = 'freeze';
     freezePowerUp.spawnTime = Date.now();
@@ -748,9 +772,11 @@ function spawnShieldPowerUp() {
         targetLandmark.y + offsetY, 
         'shield'
     );
-    // Scale shield power-up proportionally to map scale
+    // Scale shield power-up proportionally to map scale, smaller in portrait mode
     const gameScene = game.scene.getScene('default');
-    const shieldScale = 0.1 * Math.max(0.6, gameScene.mapScale);
+    const isPortrait = gameScene.scale.height > gameScene.scale.width;
+    const portraitReduction = isPortrait ? 0.7 : 1.0; // 30% smaller in portrait
+    const shieldScale = 0.1 * Math.max(0.6, gameScene.mapScale) * portraitReduction;
     shieldPowerUp.setScale(shieldScale);
     shieldPowerUp.powerType = 'shield';
     shieldPowerUp.targetLandmark = targetLandmark;
@@ -814,6 +840,85 @@ function collectPowerUp(player, powerUp) {
     }
     
     powerUp.destroy();
+}
+
+// Fullscreen functionality
+function setupFullscreen() {
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                     ('ontouchstart' in window) || 
+                     (navigator.maxTouchPoints > 0);
+    
+    if (isMobile && fullscreenBtn) {
+        fullscreenBtn.style.display = 'block';
+        
+        fullscreenBtn.addEventListener('click', toggleFullscreen);
+        
+        // Listen for fullscreen changes to update button appearance
+        document.addEventListener('fullscreenchange', updateFullscreenButton);
+        document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
+        document.addEventListener('mozfullscreenchange', updateFullscreenButton);
+        document.addEventListener('MSFullscreenChange', updateFullscreenButton);
+    }
+}
+
+function toggleFullscreen() {
+    const gameContainer = document.getElementById('gameContainer');
+    
+    if (!document.fullscreenElement && !document.webkitFullscreenElement && 
+        !document.mozFullScreenElement && !document.msFullscreenElement) {
+        // Enter fullscreen
+        if (gameContainer.requestFullscreen) {
+            gameContainer.requestFullscreen();
+        } else if (gameContainer.webkitRequestFullscreen) {
+            gameContainer.webkitRequestFullscreen();
+        } else if (gameContainer.mozRequestFullScreen) {
+            gameContainer.mozRequestFullScreen();
+        } else if (gameContainer.msRequestFullscreen) {
+            gameContainer.msRequestFullscreen();
+        }
+        
+        // Lock orientation to landscape if possible
+        if (screen.orientation && screen.orientation.lock) {
+            screen.orientation.lock('landscape').catch(() => {
+                // Orientation lock failed, but that's ok
+            });
+        }
+    } else {
+        // Exit fullscreen
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+        } else if (document.mozCancelFullScreen) {
+            document.mozCancelFullScreen();
+        } else if (document.msExitFullscreen) {
+            document.msExitFullscreen();
+        }
+        
+        // Unlock orientation
+        if (screen.orientation && screen.orientation.unlock) {
+            screen.orientation.unlock();
+        }
+    }
+}
+
+function updateFullscreenButton() {
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+    if (fullscreenBtn) {
+        const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement || 
+                           document.mozFullScreenElement || document.msFullscreenElement;
+        
+        fullscreenBtn.textContent = isFullscreen ? '⛉' : '⛶';
+        fullscreenBtn.title = isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen';
+    }
+    
+    // Resize game when fullscreen changes
+    setTimeout(() => {
+        if (game && game.scene && game.scene.scenes[0]) {
+            game.scale.resize(window.innerWidth, window.innerHeight);
+        }
+    }, 100);
 }
 
 function endGame() {
@@ -1025,4 +1130,5 @@ function hideOrientationHint() {
 // Initialize when page loads
 window.addEventListener('load', () => {
     // Don't initialize the game immediately - wait for start button
+    setupFullscreen(); // Setup fullscreen functionality
 });
