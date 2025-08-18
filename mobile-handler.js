@@ -239,6 +239,16 @@ class MobileHandler {
                 this.gameScene.mapWidth,
                 this.gameScene.mapHeight
             );
+
+            // Clamp player inside new bounds (extra safety on mobile)
+            if (window.player) {
+                const left = this.gameScene.mapOffsetX;
+                const right = this.gameScene.mapOffsetX + this.gameScene.mapWidth;
+                const top = this.gameScene.mapOffsetY;
+                const bottom = this.gameScene.mapOffsetY + this.gameScene.mapHeight;
+                window.player.x = Phaser.Math.Clamp(window.player.x, left, right);
+                window.player.y = Phaser.Math.Clamp(window.player.y, top, bottom);
+            }
             resolve();
         });
     }

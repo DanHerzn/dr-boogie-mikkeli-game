@@ -516,6 +516,36 @@ function update() {
                 disaster.y < mapTop || disaster.y > mapBottom) {
                 disaster.destroy();
             }
+
+            // Soft clamp: if slightly outside the exact map rectangle, bring back in and flip velocity
+            const exactLeft = scene.mapOffsetX;
+            const exactRight = scene.mapOffsetX + scene.mapWidth;
+            const exactTop = scene.mapOffsetY;
+            const exactBottom = scene.mapOffsetY + scene.mapHeight;
+            let bounced = false;
+            if (disaster.x < exactLeft) {
+                disaster.x = exactLeft;
+                disaster.body.setVelocityX(Math.abs(disaster.body.velocity.x));
+                bounced = true;
+            } else if (disaster.x > exactRight) {
+                disaster.x = exactRight;
+                disaster.body.setVelocityX(-Math.abs(disaster.body.velocity.x));
+                bounced = true;
+            }
+            if (disaster.y < exactTop) {
+                disaster.y = exactTop;
+                disaster.body.setVelocityY(Math.abs(disaster.body.velocity.y));
+                bounced = true;
+            } else if (disaster.y > exactBottom) {
+                disaster.y = exactBottom;
+                disaster.body.setVelocityY(-Math.abs(disaster.body.velocity.y));
+                bounced = true;
+            }
+            if (bounced && (disaster.originalVelocityX !== undefined && disaster.originalVelocityY !== undefined)) {
+                // Keep original velocity vectors roughly aligned after bounce
+                disaster.originalVelocityX = disaster.body.velocity.x;
+                disaster.originalVelocityY = disaster.body.velocity.y;
+            }
         }
     });
     
@@ -529,6 +559,16 @@ function update() {
             }
         }
     });
+
+    // Clamp player to exact map rectangle every frame to prevent leaving bounds on mobile
+    if (player && this.mapOffsetX !== undefined) {
+        const left = this.mapOffsetX;
+        const right = this.mapOffsetX + this.mapWidth;
+        const top = this.mapOffsetY;
+        const bottom = this.mapOffsetY + this.mapHeight;
+        player.x = Phaser.Math.Clamp(player.x, left, right);
+        player.y = Phaser.Math.Clamp(player.y, top, bottom);
+    }
 }
 
 function spawnDisaster() {
@@ -550,23 +590,23 @@ function spawnDisaster() {
     switch (side) {
         case 0: // Top edge of map
             mapX = Phaser.Math.Between(0, coordinateManager.baseMapWidth);
-            mapY = -50 / scene.mapScale; // Convert screen pixels to map coordinates
-            velocityY = Phaser.Math.Between(80, 200) * speedMultiplier * scaleForSpeed;
+            mapY = 0; // exactly at top edge inside map
+            velocityY = Phaser.Math.Between(80, 200) * speedMultiplier * scaleForSpeed; // moving downwards
             break;
         case 1: // Right edge of map
-            mapX = coordinateManager.baseMapWidth + (50 / scene.mapScale);
+            mapX = coordinateManager.baseMapWidth; // exactly at right edge inside map
             mapY = Phaser.Math.Between(0, coordinateManager.baseMapHeight);
-            velocityX = Phaser.Math.Between(-200, -80) * speedMultiplier * scaleForSpeed;
+            velocityX = Phaser.Math.Between(-200, -80) * speedMultiplier * scaleForSpeed; // moving leftwards
             break;
         case 2: // Bottom edge of map
             mapX = Phaser.Math.Between(0, coordinateManager.baseMapWidth);
-            mapY = coordinateManager.baseMapHeight + (50 / scene.mapScale);
-            velocityY = Phaser.Math.Between(-200, -80) * speedMultiplier * scaleForSpeed;
+            mapY = coordinateManager.baseMapHeight; // exactly at bottom edge inside map
+            velocityY = Phaser.Math.Between(-200, -80) * speedMultiplier * scaleForSpeed; // moving upwards
             break;
         case 3: // Left edge of map
-            mapX = -50 / scene.mapScale;
+            mapX = 0; // exactly at left edge inside map
             mapY = Phaser.Math.Between(0, coordinateManager.baseMapHeight);
-            velocityX = Phaser.Math.Between(80, 200) * speedMultiplier * scaleForSpeed;
+            velocityX = Phaser.Math.Between(80, 200) * speedMultiplier * scaleForSpeed; // moving rightwards
             break;
     }
 
