@@ -55,7 +55,12 @@
             
             <!-- Mobile Controls -->
             <div id="mobileControls" class="mobile-controls">
-                <div class="arrow-controls">
+                <div class="joystick" id="joystick">
+                    <div class="joystick-base"></div>
+                    <div class="joystick-knob" id="joystickKnob"></div>
+                </div>
+                <!-- Fallback arrows (hidden by default) -->
+                <div class="arrow-controls" id="fallbackArrows">
                     <div class="arrow-row top">
                         <button id="upArrow" class="arrow-btn up">↑</button>
                     </div>

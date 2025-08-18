@@ -53,7 +53,17 @@ let mobileControls = {
     up: false,
     down: false,
     left: false,
-    right: false
+    right: false,
+    // Joystick state
+    joystick: {
+        active: false,
+        startX: 0,
+        startY: 0,
+        dx: 0,
+        dy: 0,
+        normX: 0,
+        normY: 0
+    }
 };
 
 // Difficulty settings
@@ -485,21 +495,18 @@ function update() {
     const basePlayerSpeed = 200;
     const scaledSpeed = basePlayerSpeed * scale;
 
-    if (cursors.left.isDown || mobileControls.left) {
-        player.setVelocityX(-scaledSpeed);
-    } else if (cursors.right.isDown || mobileControls.right) {
-        player.setVelocityX(scaledSpeed);
+    // Input priority: joystick (mobile) > arrows (mobile) > keyboard
+    let vx = 0, vy = 0;
+    if (mobileControls.joystick.active) {
+        vx = mobileControls.joystick.normX * scaledSpeed;
+        vy = mobileControls.joystick.normY * scaledSpeed;
     } else {
-        player.setVelocityX(0);
+        if (cursors.left.isDown || mobileControls.left) vx = -scaledSpeed;
+        else if (cursors.right.isDown || mobileControls.right) vx = scaledSpeed;
+        if (cursors.up.isDown || mobileControls.up) vy = -scaledSpeed;
+        else if (cursors.down.isDown || mobileControls.down) vy = scaledSpeed;
     }
-
-    if (cursors.up.isDown || mobileControls.up) {
-        player.setVelocityY(-scaledSpeed);
-    } else if (cursors.down.isDown || mobileControls.down) {
-        player.setVelocityY(scaledSpeed);
-    } else {
-        player.setVelocityY(0);
-    }
+    player.setVelocity(vx, vy);
 
     // Update disasters
     disasters.children.entries.forEach(disaster => {
@@ -1638,6 +1645,66 @@ function setupMobileControls() {
             setTimeout(checkOrientation, 100);
         });
         window.addEventListener('resize', checkOrientation);
+        // Setup virtual joystick
+        const joystick = document.getElementById('joystick');
+        const knob = document.getElementById('joystickKnob');
+        if (joystick && knob) {
+            const maxRadius = () => Math.min(joystick.clientWidth, joystick.clientHeight) * 0.4;
+            const setKnob = (dx, dy) => {
+                const r = Math.min(Math.hypot(dx, dy), maxRadius());
+                const angle = Math.atan2(dy, dx);
+                const x = Math.cos(angle) * r;
+                const y = Math.sin(angle) * r;
+                knob.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
+            };
+            const updateVector = (clientX, clientY) => {
+                const rect = joystick.getBoundingClientRect();
+                const cx = rect.left + rect.width / 2;
+                const cy = rect.top + rect.height / 2;
+                const dx = clientX - cx;
+                const dy = clientY - cy;
+                const r = Math.hypot(dx, dy) || 1;
+                const clampR = maxRadius();
+                // Normalized direction limited to unit circle
+                const nx = dx / r;
+                const ny = dy / r;
+                // Apply deadzone to reduce jitter
+                const dead = 0.12;
+                const mag = Math.min(r / clampR, 1);
+                const eff = mag < dead ? 0 : (mag - dead) / (1 - dead);
+                mobileControls.joystick.dx = dx;
+                mobileControls.joystick.dy = dy;
+                mobileControls.joystick.normX = nx * eff;
+                mobileControls.joystick.normY = ny * eff;
+                setKnob(dx, dy);
+            };
+            const start = (e) => {
+                mobileControls.joystick.active = true;
+                const pt = (e.touches && e.touches[0]) || e;
+                updateVector(pt.clientX, pt.clientY);
+            };
+            const move = (e) => {
+                if (!mobileControls.joystick.active) return;
+                const pt = (e.touches && e.touches[0]) || e;
+                updateVector(pt.clientX, pt.clientY);
+            };
+            const end = () => {
+                mobileControls.joystick.active = false;
+                mobileControls.joystick.dx = mobileControls.joystick.dy = 0;
+                mobileControls.joystick.normX = mobileControls.joystick.normY = 0;
+                knob.style.transform = 'translate(-50%, -50%)';
+            };
+            joystick.addEventListener('touchstart', start, { passive: true });
+            joystick.addEventListener('touchmove', move, { passive: true });
+            joystick.addEventListener('touchend', end, { passive: true });
+            joystick.addEventListener('mousedown', start);
+            window.addEventListener('mousemove', move);
+            window.addEventListener('mouseup', end);
+        } else {
+            // Fallback to arrows UI
+            const fallback = document.getElementById('fallbackArrows');
+            if (fallback) fallback.style.display = 'block';
+        }
     }
     
     // Add event listeners for arrow buttons
