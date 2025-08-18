@@ -41,6 +41,18 @@ A fun browser-based game where players control Dr Boogie to save landmarks in Mi
 
 ### Deployment Options
 
+### GitHub Pages (Static)
+
+This repo includes a workflow to deploy the static front-end to GitHub Pages (backend features like the leaderboard API won’t work on Pages).
+
+Steps:
+1. Push your code to GitHub and ensure default branch is `main`.
+2. In GitHub: Settings → Pages → Build and deployment → Source: GitHub Actions.
+3. The workflow `.github/workflows/deploy.yml` will build and publish the site to Pages on every push to `main`.
+4. Your site will be available at `https://<your-username>.github.io/<repo-name>/`.
+
+Note: Assets with spaces in filenames (e.g., `Shield.56 PM`) are handled in the workflow copy step. If you add more assets, update the copy list.
+
 #### Heroku Deployment
 
 1. **Create a Heroku app**:

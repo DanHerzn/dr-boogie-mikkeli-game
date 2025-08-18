@@ -162,9 +162,11 @@ function create() {
     // Initialize mobile handling systems
     if (!coordinateManager) {
         coordinateManager = new CoordinateManager();
+        window.coordinateManager = coordinateManager;
     }
     if (!mobileHandler) {
         mobileHandler = new MobileHandler();
+        window.mobileHandler = mobileHandler;
         mobileHandler.setGameScene(this);
     }
     
@@ -286,14 +288,13 @@ function create() {
     const playerScale = 0.15 * Math.max(0.6, this.mapScale) * portraitReduction;
     player.setScale(playerScale);
     
-    // Set collision box size based on the scaled player size
-    const scaledPlayerWidth = player.width * playerScale;
-    const scaledPlayerHeight = player.height * playerScale;
-    player.body.setSize(scaledPlayerWidth * 0.8, scaledPlayerHeight * 0.8);
-    // Center the collision box properly
+    // Set collision box based on display size (post-scale) and center it
+    const bodyPlayerWidth = player.displayWidth * 0.8;
+    const bodyPlayerHeight = player.displayHeight * 0.8;
+    player.body.setSize(player.displayWidth * 0.9, player.displayHeight * 0.9);
     player.body.setOffset(
-        (player.width - scaledPlayerWidth * 0.8) / 2,
-        (player.height - scaledPlayerHeight * 0.8) / 2
+        (player.displayWidth - player.displayWidth * 0.9) / 2,
+        (player.displayHeight - player.displayHeight * 0.9) / 2
     );
 
     // Create landmarks as invisible collision areas with dot overlays
@@ -312,15 +313,15 @@ function create() {
             screenY = this.mapOffsetY + (landmarkInfo.y * this.mapScale);
         }
         
-        // Create invisible circular collision area, centered
+    // Create invisible circular collision area, centered
         const landmark = this.physics.add.sprite(screenX, screenY, null);
         landmark.setImmovable(true);
         landmark.landmarkData = landmarkInfo;
         landmark.setVisible(false); // Make it invisible
         // Scale collision area with map scale (base 40px radius)
-        const landmarkRadius = Math.max(20, 40 * this.mapScale);
-        landmark.body.setCircle(landmarkRadius); // Scaled radius circle, centered
-        landmark.body.setOffset(0, 0); // No offset needed for circle collision
+    const landmarkRadius = Math.max(20, 40 * this.mapScale);
+    // Center the circle at the sprite position; using -r offsets because sprite has no texture
+    landmark.body.setCircle(landmarkRadius, -landmarkRadius, -landmarkRadius);
         landmark.scene = this; // Store scene reference
         landmarks.add(landmark);
 
@@ -348,6 +349,12 @@ function create() {
     
     // Create power-ups group
     powerUps = this.physics.add.group();
+
+    // Expose key objects for mobile handler and tests
+    window.player = player;
+    window.landmarks = landmarks;
+    window.disasters = disasters;
+    window.powerUps = powerUps;
 
     // Set up collisions
     this.physics.add.overlap(player, landmarks, saveLandmark, null, this);
@@ -415,6 +422,25 @@ function create() {
     if (mobileHandler) {
         mobileHandler.setupOrientationHandling();
     }
+
+    // Physics debug toggle (press 'D' to toggle) and global toggle method
+    this.physics.world.createDebugGraphic();
+    this.physics.world.drawDebug = false;
+    if (this.physics.world.debugGraphic) {
+        this.physics.world.debugGraphic.setVisible(false);
+    }
+    this.input.keyboard.on('keydown-D', () => {
+        const w = this.physics.world;
+        w.drawDebug = !w.drawDebug;
+        if (w.debugGraphic) w.debugGraphic.setVisible(w.drawDebug);
+    });
+    // Also expose a toggle for external callers
+    window.togglePhysicsDebug = () => {
+        const w = game && game.scene && game.scene.scenes[0] && game.scene.scenes[0].physics.world;
+        if (!w) return;
+        w.drawDebug = !w.drawDebug;
+        if (w.debugGraphic) w.debugGraphic.setVisible(w.drawDebug);
+    };
 }
 
 function update() {
@@ -580,14 +606,14 @@ function spawnDisaster() {
         disaster.setScale(disasterScale);
     }
     
-    // Set collision box based on the scaled disaster size
+    // Set collision box based on the display size (post-scale)
     if (disaster.body) {
-        const scaledDisasterWidth = disaster.width * disasterScale;
-        const scaledDisasterHeight = disaster.height * disasterScale;
-        disaster.body.setSize(scaledDisasterWidth * 0.8, scaledDisasterHeight * 0.8);
+        const bodyW = disaster.displayWidth * 0.8;
+        const bodyH = disaster.displayHeight * 0.8;
+        disaster.body.setSize(bodyW, bodyH);
         disaster.body.setOffset(
-            (disaster.width - scaledDisasterWidth * 0.8) / 2,
-            (disaster.height - scaledDisasterHeight * 0.8) / 2
+            (disaster.displayWidth - bodyW) / 2,
+            (disaster.displayHeight - bodyH) / 2
         );
     }
     
@@ -916,12 +942,12 @@ function spawnFreezePowerUp() {
     
     // Set collision box based on the scaled power-up size
     if (freezePowerUp.body) {
-        const scaledPowerUpWidth = freezePowerUp.width * powerUpScale;
-        const scaledPowerUpHeight = freezePowerUp.height * powerUpScale;
-        freezePowerUp.body.setSize(scaledPowerUpWidth, scaledPowerUpHeight);
+        const bodyW = freezePowerUp.displayWidth;
+        const bodyH = freezePowerUp.displayHeight;
+        freezePowerUp.body.setSize(bodyW, bodyH);
         freezePowerUp.body.setOffset(
-            (freezePowerUp.width - scaledPowerUpWidth) / 2,
-            (freezePowerUp.height - scaledPowerUpHeight) / 2
+            (freezePowerUp.displayWidth - bodyW) / 2,
+            (freezePowerUp.displayHeight - bodyH) / 2
         );
     }
     
@@ -990,12 +1016,12 @@ function spawnShieldPowerUp() {
     
     // Set collision box based on the scaled shield power-up size
     if (shieldPowerUp.body) {
-        const scaledShieldWidth = shieldPowerUp.width * shieldScale;
-        const scaledShieldHeight = shieldPowerUp.height * shieldScale;
-        shieldPowerUp.body.setSize(scaledShieldWidth, scaledShieldHeight);
+        const bodyW = shieldPowerUp.displayWidth;
+        const bodyH = shieldPowerUp.displayHeight;
+        shieldPowerUp.body.setSize(bodyW, bodyH);
         shieldPowerUp.body.setOffset(
-            (shieldPowerUp.width - scaledShieldWidth) / 2,
-            (shieldPowerUp.height - scaledShieldHeight) / 2
+            (shieldPowerUp.displayWidth - bodyW) / 2,
+            (shieldPowerUp.displayHeight - bodyH) / 2
         );
     }
     
@@ -1235,9 +1261,9 @@ function recalculateMapForFullscreen(scene) {
         
         console.log(`Screen dimensions: ${screenWidth}x${screenHeight}, Fullscreen: ${isFullscreen}`);
         
-        // Map original dimensions (adjust these based on your actual map size)
-        const mapWidth = 1200;  // Adjust to your map's actual width
-        const mapHeight = 800;  // Adjust to your map's actual height
+    // Use actual map dimensions from the loaded sprite/coordinate manager
+    const mapWidth = (scene.mapSprite && scene.mapSprite.width) || (window.coordinateManager && window.coordinateManager.baseMapWidth) || 1200;
+    const mapHeight = (scene.mapSprite && scene.mapSprite.height) || (window.coordinateManager && window.coordinateManager.baseMapHeight) || 800;
         
         let scaleX = screenWidth / mapWidth;
         let scaleY = screenHeight / mapHeight;
@@ -1288,8 +1314,8 @@ function recalculateMapForFullscreen(scene) {
             }
         }
         
-        // Update scene's map scale
-        scene.mapScale = scale;
+    // Update scene's map scale
+    scene.mapScale = scale;
         
         // Recalculate map position (center it)
         const scaledMapWidth = mapWidth * scale;
@@ -1297,6 +1323,11 @@ function recalculateMapForFullscreen(scene) {
         
         scene.mapOffsetX = (screenWidth - scaledMapWidth) / 2;
         scene.mapOffsetY = (screenHeight - scaledMapHeight) / 2;
+
+        // Sync coordinate manager with new transform
+        if (window.coordinateManager && typeof window.coordinateManager.updateTransform === 'function') {
+            window.coordinateManager.updateTransform(scene.mapScale, scene.mapOffsetX, scene.mapOffsetY);
+        }
         
         console.log(`New map scale: ${scale}, offset: (${scene.mapOffsetX}, ${scene.mapOffsetY})`);
         
@@ -1307,8 +1338,18 @@ function recalculateMapForFullscreen(scene) {
             scene.mapSprite.x = scene.mapOffsetX;
             scene.mapSprite.y = scene.mapOffsetY;
         }
+
+        // Update physics world bounds to the new map rectangle
+        if (scene.physics && scene.physics.world) {
+            scene.physics.world.setBounds(
+                scene.mapOffsetX,
+                scene.mapOffsetY,
+                scaledMapWidth,
+                scaledMapHeight
+            );
+        }
         
-        // Update player scale and position if exists
+    // Update player scale and position if exists
         if (player) {
             const isPortrait = screenHeight > screenWidth;
             const portraitReduction = isPortrait ? 0.5 : 1.0;
@@ -1317,15 +1358,22 @@ function recalculateMapForFullscreen(scene) {
             
             // Update player collision box to match new scale
             if (player.body) {
-                const playerWidth = player.width * playerScale;
-                const playerHeight = player.height * playerScale;
-                player.body.setSize(playerWidth * 0.8, playerHeight * 0.8);
-                // Center the collision box
+                const bodyW = player.displayWidth * 0.9;
+                const bodyH = player.displayHeight * 0.9;
+                player.body.setSize(bodyW, bodyH);
                 player.body.setOffset(
-                    (player.width - playerWidth * 0.8) / 2,
-                    (player.height - playerHeight * 0.8) / 2
+                    (player.displayWidth - bodyW) / 2,
+                    (player.displayHeight - bodyH) / 2
                 );
             }
+
+            // Clamp player inside new map bounds
+            const left = scene.mapOffsetX;
+            const right = scene.mapOffsetX + scaledMapWidth;
+            const top = scene.mapOffsetY;
+            const bottom = scene.mapOffsetY + scaledMapHeight;
+            player.x = Phaser.Math.Clamp(player.x, left, right);
+            player.y = Phaser.Math.Clamp(player.y, top, bottom);
         }
         
         // Update landmarks positions and scales
@@ -1340,8 +1388,7 @@ function recalculateMapForFullscreen(scene) {
                     // Update collision radius and body
                     const landmarkRadius = Math.max(20, 40 * scale);
                     if (landmark.body) {
-                        landmark.body.setCircle(landmarkRadius);
-                        landmark.body.setOffset(0, 0); // Center the circle
+                        landmark.body.setCircle(landmarkRadius, -landmarkRadius, -landmarkRadius);
                     }
                     
                     // Update dot overlay position
@@ -1361,9 +1408,9 @@ function recalculateMapForFullscreen(scene) {
         // Update disasters positions and scales
         if (disasters && disasters.children && disasters.children.entries) {
             disasters.children.entries.forEach((disaster) => {
-                if (disaster.originalX !== undefined && disaster.originalY !== undefined) {
-                    const screenX = scene.mapOffsetX + (disaster.originalX * scale);
-                    const screenY = scene.mapOffsetY + (disaster.originalY * scale);
+                if (disaster.originalMapX !== undefined && disaster.originalMapY !== undefined) {
+                    const screenX = scene.mapOffsetX + (disaster.originalMapX * scale);
+                    const screenY = scene.mapOffsetY + (disaster.originalMapY * scale);
                     disaster.setPosition(screenX, screenY);
                     
                     const isPortrait = screenHeight > screenWidth;
@@ -1373,12 +1420,12 @@ function recalculateMapForFullscreen(scene) {
                     
                     // Update collision box for disasters
                     if (disaster.body) {
-                        const disasterWidth = disaster.width * disasterScale;
-                        const disasterHeight = disaster.height * disasterScale;
-                        disaster.body.setSize(disasterWidth * 0.8, disasterHeight * 0.8);
+                        const bodyW = disaster.displayWidth * 0.8;
+                        const bodyH = disaster.displayHeight * 0.8;
+                        disaster.body.setSize(bodyW, bodyH);
                         disaster.body.setOffset(
-                            (disaster.width - disasterWidth * 0.8) / 2,
-                            (disaster.height - disasterHeight * 0.8) / 2
+                            (disaster.displayWidth - bodyW) / 2,
+                            (disaster.displayHeight - bodyH) / 2
                         );
                     }
                 }
@@ -1388,9 +1435,9 @@ function recalculateMapForFullscreen(scene) {
         // Update power-ups positions and scales
         if (powerUps && powerUps.children && powerUps.children.entries) {
             powerUps.children.entries.forEach((powerUp) => {
-                if (powerUp.originalX !== undefined && powerUp.originalY !== undefined) {
-                    const screenX = scene.mapOffsetX + (powerUp.originalX * scale);
-                    const screenY = scene.mapOffsetY + (powerUp.originalY * scale);
+                if (powerUp.originalMapX !== undefined && powerUp.originalMapY !== undefined) {
+                    const screenX = scene.mapOffsetX + (powerUp.originalMapX * scale);
+                    const screenY = scene.mapOffsetY + (powerUp.originalMapY * scale);
                     powerUp.setPosition(screenX, screenY);
                     
                     const isPortrait = screenHeight > screenWidth;
@@ -1400,12 +1447,12 @@ function recalculateMapForFullscreen(scene) {
                     
                     // Update collision box for power-ups
                     if (powerUp.body) {
-                        const powerUpWidth = powerUp.width * powerUpScale;
-                        const powerUpHeight = powerUp.height * powerUpScale;
-                        powerUp.body.setSize(powerUpWidth, powerUpHeight);
+                        const bodyW = powerUp.displayWidth;
+                        const bodyH = powerUp.displayHeight;
+                        powerUp.body.setSize(bodyW, bodyH);
                         powerUp.body.setOffset(
-                            (powerUp.width - powerUpWidth) / 2,
-                            (powerUp.height - powerUpHeight) / 2
+                            (powerUp.displayWidth - bodyW) / 2,
+                            (powerUp.displayHeight - bodyH) / 2
                         );
                     }
                 }
@@ -1460,6 +1507,8 @@ function endGame() {
 
 function initializeGame() {
     game = new Phaser.Game(config);
+    // Expose game instance globally for tests and debug tools
+    window.game = game;
     
     // Handle screen resize and orientation changes with improved fullscreen support
     window.addEventListener('resize', () => {

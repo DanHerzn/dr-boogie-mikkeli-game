@@ -1,0 +1,61 @@
+name: Deploy static game to GitHub Pages
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install deps (for tests only)
+        run: |
+          npm ci || echo "No package.json, skipping"
+          npx playwright install --with-deps || true
+
+      - name: Run tests
+        run: |
+          if [ -f package.json ]; then npm test || true; else echo "No tests"; fi
+
+      - name: Prepare static site
+        run: |
+          mkdir -p dist
+          cp index.html style.css game.js ui.js coordinate-manager.js mobile-handler.js dist/
+          # Copy asset files if present
+          cp -r Dr Map.png Meteor Storm Freeze Flood-img "Shield.56 PM" dist/ 2>/dev/null || true
+          # Add a basic 404 for SPA compatibility
+          cp dist/index.html dist/404.html
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

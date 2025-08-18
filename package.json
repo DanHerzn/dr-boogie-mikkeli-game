@@ -21,8 +21,11 @@
   "scripts": {
     "start": "python -m http.server 8000",
     "serve": "python -m http.server 8000",
-    "deploy": "echo 'Use deploy.ps1 or deploy.sh script'"
+    "deploy": "echo 'Use deploy.ps1 or deploy.sh script'",
+    "test": "playwright test",
+    "test:ui": "playwright test --ui"
   },
-  "devDependencies": {},
-  "dependencies": {}
+  "devDependencies": {
+    "@playwright/test": "^1.54.2"
+  }
 }
