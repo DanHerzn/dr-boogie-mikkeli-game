@@ -103,6 +103,18 @@ const landmarkData = [
     { name: 'Harbor Area', x: 859, y: 378, saved: false, destroyed: false } // Point 13
 ];
 
+// Consistent disaster scaling function used across spawn and orientation/fullscreen recalcs
+function getDisasterScale(type, mapScale, isPortrait) {
+    const portraitReduction = isPortrait ? 0.7 : 1.0;
+    // Base multipliers tuned per asset intrinsic size
+    const base = (type === 'storm') ? 0.15 : 0.2; // storm a bit smaller
+    // Ensure mapScale has a gentle lower bound to avoid too tiny sprites
+    const scaleComponent = Math.max(0.6, mapScale);
+    return base * scaleComponent * portraitReduction;
+}
+// Expose globally so mobile-handler can use the same logic
+window.getDisasterScale = getDisasterScale;
+
 function preload() {
     // Load the Mikkeli map image with manually placed landmarks
     this.load.image('mikkeliMap', 'Map.png');
@@ -299,15 +311,10 @@ function create() {
     const playerScale = 0.15 * Math.max(0.6, this.mapScale) * portraitReduction;
     player.setScale(playerScale);
     
-    // Set collision box based on display size (post-scale) and center it
-    const bodyPlayerWidth = player.displayWidth * 0.8;
-    const bodyPlayerHeight = player.displayHeight * 0.8;
-    player.body.setSize(player.displayWidth * 0.95, player.displayHeight * 0.95);
-    player.body.setOffset(
-        (player.displayWidth - player.displayWidth * 0.95) / 2,
-        (player.displayHeight - player.displayHeight * 0.95) / 2
-    );
-
+    // Use a centered circular body for consistent collisions across orientations
+    const playerRadius = Math.min(player.displayWidth, player.displayHeight) * 0.45; // slightly inside sprite
+    player.body.setCircle(playerRadius, (player.displayWidth - playerRadius * 2) / 2, (player.displayHeight - playerRadius * 2) / 2);
+    
     // Create landmarks as invisible collision areas with dot overlays
     landmarks = this.physics.add.group();
     
@@ -521,7 +528,9 @@ function update() {
             // Remove disasters that go too far from map area
             if (disaster.x < mapLeft || disaster.x > mapRight || 
                 disaster.y < mapTop || disaster.y > mapBottom) {
+                destroyCollisionOverlay(disaster);
                 disaster.destroy();
+                return;
             }
 
             // Soft clamp: if slightly outside the exact map rectangle, bring back in and flip velocity
@@ -554,6 +563,7 @@ function update() {
                 disaster.originalVelocityY = disaster.body.velocity.y;
             }
         }
+        updateCollisionOverlay(disaster);
     });
     
     // Update power-ups - remove if they go off screen or are too old
@@ -562,9 +572,12 @@ function update() {
             powerUp.spawnTime = powerUp.spawnTime || Date.now();
             // Remove power-ups after 15 seconds
             if (Date.now() - powerUp.spawnTime > 15000) {
+                destroyCollisionOverlay(powerUp);
                 powerUp.destroy();
+                return;
             }
         }
+        updateCollisionOverlay(powerUp);
     });
 
     // Clamp player to exact map rectangle every frame to prevent leaving bounds on mobile
@@ -575,108 +588,6 @@ function update() {
         const bottom = this.mapOffsetY + this.mapHeight;
         player.x = Phaser.Math.Clamp(player.x, left, right);
         player.y = Phaser.Math.Clamp(player.y, top, bottom);
-    }
-}
-
-function spawnDisaster() {
-    if (!isGameRunning || isFrozen) return; // Don't spawn disasters during freeze
-
-    const disasterTypes = ['meteor', 'flood', 'storm'];
-    const type = Phaser.Utils.Array.GetRandom(disasterTypes);
-    
-    // Get map boundaries using coordinate manager
-    const scene = game.scene.getScene('default');
-    const mapBounds = coordinateManager.getMapBounds();
-    
-    // Spawn disasters from edges of the map area (not screen edges)
-    let mapX, mapY, velocityX = 0, velocityY = 0;
-    const speedMultiplier = difficultySettings[difficulty].disasterSpeed;
-    const scaleForSpeed = scene.mapScale || 1;
-    
-    const side = Phaser.Math.Between(0, 3);
-    switch (side) {
-        case 0: // Top edge of map
-            mapX = Phaser.Math.Between(0, coordinateManager.baseMapWidth);
-            mapY = 0; // exactly at top edge inside map
-            velocityY = Phaser.Math.Between(80, 200) * speedMultiplier * scaleForSpeed; // moving downwards
-            break;
-        case 1: // Right edge of map
-            mapX = coordinateManager.baseMapWidth; // exactly at right edge inside map
-            mapY = Phaser.Math.Between(0, coordinateManager.baseMapHeight);
-            velocityX = Phaser.Math.Between(-200, -80) * speedMultiplier * scaleForSpeed; // moving leftwards
-            break;
-        case 2: // Bottom edge of map
-            mapX = Phaser.Math.Between(0, coordinateManager.baseMapWidth);
-            mapY = coordinateManager.baseMapHeight; // exactly at bottom edge inside map
-            velocityY = Phaser.Math.Between(-200, -80) * speedMultiplier * scaleForSpeed; // moving upwards
-            break;
-        case 3: // Left edge of map
-            mapX = 0; // exactly at left edge inside map
-            mapY = Phaser.Math.Between(0, coordinateManager.baseMapHeight);
-            velocityX = Phaser.Math.Between(80, 200) * speedMultiplier * scaleForSpeed; // moving rightwards
-            break;
-    }
-
-    // Convert map coordinates to screen coordinates
-    const screenPos = coordinateManager.mapToScreen(mapX, mapY);
-    const disaster = disasters.create(screenPos.x, screenPos.y, type);
-    disaster.disasterType = type;
-    
-    // Store original map coordinates for coordinate manager tracking
-    disaster.originalMapX = mapX;
-    disaster.originalMapY = mapY;
-    
-    // Store original velocity
-    disaster.originalVelocityX = velocityX;
-    disaster.originalVelocityY = velocityY;
-    
-    // Track disaster with mobile handler
-    mobileHandler.addElementToTrack(disaster, 'disaster', {
-        mapX: mapX,
-        mapY: mapY
-    });
-    
-    // If frozen, don't move initially
-    if (isFrozen) {
-        disaster.setVelocity(0, 0);
-    } else {
-        disaster.setVelocity(velocityX, velocityY);
-    }
-    
-    // Scale disaster images proportionally to map scale, smaller in portrait mode
-    const sceneForScale = game.scene.getScene('default');
-    const isPortrait = sceneForScale.scale.height > sceneForScale.scale.width;
-    const portraitReduction = isPortrait ? 0.7 : 1.0; // 30% smaller in portrait
-    const scaleMultiplier = Math.max(0.5, sceneForScale.mapScale) * portraitReduction;
-    
-    let disasterScale;
-    if (type === 'meteor') {
-        disasterScale = 0.2 * scaleMultiplier;
-        disaster.setScale(disasterScale);
-    } else if (type === 'storm') {
-        disasterScale = 0.15 * scaleMultiplier;
-        disaster.setScale(disasterScale);
-    } else if (type === 'flood') {
-        disasterScale = 0.2 * scaleMultiplier;
-        disaster.setScale(disasterScale);
-    }
-    
-    // Set collision box based on the display size (post-scale)
-    if (disaster.body) {
-        const bodyW = disaster.displayWidth * 0.8;
-        const bodyH = disaster.displayHeight * 0.8;
-        disaster.body.setSize(bodyW, bodyH);
-        disaster.body.setOffset(
-            (disaster.displayWidth - bodyW) / 2,
-            (disaster.displayHeight - bodyH) / 2
-        );
-    }
-    
-    // Add some random movement for more dynamic disasters
-    if (type === 'storm') {
-        disaster.setAngularVelocity(100);
-    } else if (type === 'flood') {
-        disaster.setAngularVelocity(50);
     }
 }
 
@@ -691,6 +602,55 @@ function drawDotOverlay(graphics, color, scale) {
     // Draw circle dot
     graphics.fillCircle(0, 0, size);
     graphics.strokeCircle(0, 0, size);
+}
+
+// Lightweight visual aid: small collision radius overlay for disasters/power-ups
+function drawCollisionOverlay(graphics, radius, color = 0xffffff, alpha = 0.35, thickness = 2) {
+    if (!graphics) return;
+    graphics.clear();
+    graphics.lineStyle(thickness, color, alpha);
+    graphics.strokeCircle(0, 0, radius);
+}
+
+function getCollisionOverlayRadius(sprite) {
+    if (!sprite) return 0;
+    const bw = (sprite.body && sprite.body.width) ? sprite.body.width : sprite.displayWidth || 0;
+    const bh = (sprite.body && sprite.body.height) ? sprite.body.height : sprite.displayHeight || 0;
+    const baseR = Math.min(bw, bh) / 2;
+    return Math.max(4, baseR * 0.9);
+}
+
+function ensureCollisionOverlay(sprite, color) {
+    if (!sprite || !sprite.scene) return;
+    if (!sprite.collisionOverlay || !sprite.collisionOverlay.scene) {
+        const g = sprite.scene.add.graphics();
+        g.setDepth((sprite.depth || 0) + 1);
+        sprite.collisionOverlay = g;
+        if (!sprite._collisionOverlayDestroyHook && typeof sprite.on === 'function') {
+            sprite.on('destroy', () => {
+                destroyCollisionOverlay(sprite);
+            });
+            sprite._collisionOverlayDestroyHook = true;
+        }
+    }
+    sprite.collisionOverlayColor = color || sprite.collisionOverlayColor || 0xffffff;
+    updateCollisionOverlay(sprite);
+}
+
+function updateCollisionOverlay(sprite) {
+    if (!sprite || !sprite.collisionOverlay) return;
+    const g = sprite.collisionOverlay;
+    g.x = sprite.x;
+    g.y = sprite.y;
+    const radius = getCollisionOverlayRadius(sprite);
+    drawCollisionOverlay(g, radius, sprite.collisionOverlayColor || 0xffffff);
+}
+
+function destroyCollisionOverlay(sprite) {
+    if (sprite && sprite.collisionOverlay) {
+        try { sprite.collisionOverlay.destroy(); } catch (e) { /* noop */ }
+        sprite.collisionOverlay = null;
+    }
 }
 
 function saveLandmark(player, landmark) {
@@ -788,6 +748,8 @@ function blockDisaster(player, disaster) {
         onComplete: () => text.destroy()
     });
     
+    // Clean visual overlay then destroy
+    destroyCollisionOverlay(disaster);
     disaster.destroy();
     updateUI();
 }
@@ -795,10 +757,11 @@ function blockDisaster(player, disaster) {
 function destroyLandmark(landmark, disaster) {
     // Check if landmark is already destroyed to prevent multiple penalties
     if (landmark.landmarkData.destroyed) {
+        destroyCollisionOverlay(disaster);
         disaster.destroy();
         return;
     }
-    
+
     // Check if landmark has a shield
     if (landmark.hasShield) {
         // Shield absorbs the hit
@@ -840,6 +803,7 @@ function destroyLandmark(landmark, disaster) {
             onComplete: () => text.destroy()
         });
         
+        destroyCollisionOverlay(disaster);
         disaster.destroy();
         return;
     }
@@ -894,6 +858,7 @@ function destroyLandmark(landmark, disaster) {
         onComplete: () => text.destroy()
     });
     
+    destroyCollisionOverlay(disaster);
     disaster.destroy();
     updateUI();
 }
@@ -950,11 +915,13 @@ function startGame() {
         
         // Clear existing disasters
         disasters.children.entries.forEach(disaster => {
+            destroyCollisionOverlay(disaster);
             disaster.destroy();
         });
         
         // Clear existing power-ups
         powerUps.children.entries.forEach(powerUp => {
+            destroyCollisionOverlay(powerUp);
             powerUp.destroy();
         });
     }
@@ -976,8 +943,7 @@ function spawnFreezePowerUp() {
     const mapY = Phaser.Math.Between(mapMargin, coordinateManager.baseMapHeight - mapMargin);
     
     // Convert to screen coordinates
-    const screenPos = coordinateManager.mapToScreen(mapX, mapY);
-    const freezePowerUp = powerUps.create(screenPos.x, screenPos.y, 'freeze');
+    const freezePowerUp = powerUps.create(mapX, mapY, 'freeze');
     
     // Store original map coordinates for coordinate manager tracking
     freezePowerUp.originalMapX = mapX;
@@ -996,16 +962,15 @@ function spawnFreezePowerUp() {
         mapY: mapY
     });
     
-    // Set collision box based on the scaled power-up size
+    // Set collision body to centered circle based on display size (post-scale)
     if (freezePowerUp.body) {
-        const bodyW = freezePowerUp.displayWidth;
-        const bodyH = freezePowerUp.displayHeight;
-        freezePowerUp.body.setSize(bodyW, bodyH);
-        freezePowerUp.body.setOffset(
-            (freezePowerUp.displayWidth - bodyW) / 2,
-            (freezePowerUp.displayHeight - bodyH) / 2
-        );
+        const r = Math.min(freezePowerUp.displayWidth, freezePowerUp.displayHeight) * 0.5;
+        freezePowerUp.body.setCircle(r, (freezePowerUp.displayWidth - r * 2) / 2, (freezePowerUp.displayHeight - r * 2) / 2);
     }
+
+    // Visual collision radius overlay (cyan for freeze)
+    freezePowerUp.collisionOverlayColor = 0x00ffff;
+    ensureCollisionOverlay(freezePowerUp, freezePowerUp.collisionOverlayColor);
     
     freezePowerUp.powerType = 'freeze';
     freezePowerUp.spawnTime = Date.now();
@@ -1013,7 +978,7 @@ function spawnFreezePowerUp() {
     // Add gentle floating animation
     game.scene.getScene('default').tweens.add({
         targets: freezePowerUp,
-        y: screenPos.y - 10,
+        y: freezePowerUp.y - 10,
         duration: 1000,
         yoyo: true,
         repeat: -1,
@@ -1050,8 +1015,7 @@ function spawnShieldPowerUp() {
     const shieldMapY = landmarkMapY + offsetMapY;
     
     // Convert to screen coordinates
-    const screenPos = coordinateManager.mapToScreen(shieldMapX, shieldMapY);
-    const shieldPowerUp = powerUps.create(screenPos.x, screenPos.y, 'shield');
+    const shieldPowerUp = powerUps.create(shieldMapX, shieldMapY, 'shield');
     
     // Store original map coordinates for coordinate manager tracking
     shieldPowerUp.originalMapX = shieldMapX;
@@ -1070,16 +1034,15 @@ function spawnShieldPowerUp() {
         mapY: shieldMapY
     });
     
-    // Set collision box based on the scaled shield power-up size
+    // Set collision body to centered circle based on scaled shield power-up size
     if (shieldPowerUp.body) {
-        const bodyW = shieldPowerUp.displayWidth;
-        const bodyH = shieldPowerUp.displayHeight;
-        shieldPowerUp.body.setSize(bodyW, bodyH);
-        shieldPowerUp.body.setOffset(
-            (shieldPowerUp.displayWidth - bodyW) / 2,
-            (shieldPowerUp.displayHeight - bodyH) / 2
-        );
+        const r = Math.min(shieldPowerUp.displayWidth, shieldPowerUp.displayHeight) * 0.5;
+        shieldPowerUp.body.setCircle(r, (shieldPowerUp.displayWidth - r * 2) / 2, (shieldPowerUp.displayHeight - r * 2) / 2);
     }
+
+    // Visual collision radius overlay (gold for shield)
+    shieldPowerUp.collisionOverlayColor = 0xffd700;
+    ensureCollisionOverlay(shieldPowerUp, shieldPowerUp.collisionOverlayColor);
     
     shieldPowerUp.powerType = 'shield';
     shieldPowerUp.targetLandmark = targetLandmark;
@@ -1181,6 +1144,7 @@ function collectPowerUp(player, powerUp) {
         }
     }
     
+    destroyCollisionOverlay(powerUp);
     powerUp.destroy();
 }
 
@@ -1215,7 +1179,7 @@ function setupFullscreen() {
         document.addEventListener('MSFullscreenChange', updateFullscreenButton);
         
         console.log('Fullscreen setup complete');
-    } else {
+       } else {
         console.error('Fullscreen button not found');
     }
 }
@@ -1405,6 +1369,9 @@ function recalculateMapForFullscreen(scene) {
                 scaledMapHeight
             );
         }
+        // Keep scene map dimensions in sync for per-frame clamping
+        scene.mapWidth = scaledMapWidth;
+        scene.mapHeight = scaledMapHeight;
         
     // Update player scale and position if exists
         if (player) {
@@ -1413,15 +1380,10 @@ function recalculateMapForFullscreen(scene) {
             const playerScale = 0.15 * Math.max(0.6, scale) * portraitReduction;
             player.setScale(playerScale);
             
-            // Update player collision box to match new scale
+            // Update player collision body to centered circle
             if (player.body) {
-                const bodyW = player.displayWidth * 0.9;
-                const bodyH = player.displayHeight * 0.9;
-                player.body.setSize(bodyW, bodyH);
-                player.body.setOffset(
-                    (player.displayWidth - bodyW) / 2,
-                    (player.displayHeight - bodyH) / 2
-                );
+                const r = Math.min(player.displayWidth, player.displayHeight) * 0.45;
+                player.body.setCircle(r, (player.displayWidth - r * 2) / 2, (player.displayHeight - r * 2) / 2);
                 if (typeof player.body.updateFromGameObject === 'function') {
                     player.body.updateFromGameObject();
                 }
@@ -1436,35 +1398,6 @@ function recalculateMapForFullscreen(scene) {
             player.y = Phaser.Math.Clamp(player.y, top, bottom);
         }
         
-        // Update landmarks positions and scales
-        if (landmarks && landmarks.children && landmarks.children.entries) {
-            landmarks.children.entries.forEach((landmark, index) => {
-                if (landmark.landmarkData) {
-                    const screenX = scene.mapOffsetX + (landmark.landmarkData.x * scale);
-                    const screenY = scene.mapOffsetY + (landmark.landmarkData.y * scale);
-                    
-                    landmark.setPosition(screenX, screenY);
-                    
-                    // Update collision radius and body
-                    const landmarkRadius = Math.max(20, 40 * scale);
-                    if (landmark.body) {
-                        landmark.body.setCircle(landmarkRadius, -landmarkRadius, -landmarkRadius);
-                    }
-                    
-                    // Update dot overlay position
-                    if (landmark.dotOverlay) {
-                        landmark.dotOverlay.x = screenX;
-                        landmark.dotOverlay.y = screenY;
-                        
-                        // Redraw dot overlay with new scale
-                        const color = landmark.landmarkData.saved ? 
-                            (landmark.landmarkData.destroyed ? 0xFF0000 : 0x00FF00) : 0xFFFF00;
-                        drawDotOverlay(landmark.dotOverlay, color, scale);
-                    }
-                }
-            });
-        }
-        
         // Update disasters positions and scales
         if (disasters && disasters.children && disasters.children.entries) {
             disasters.children.entries.forEach((disaster) => {
@@ -1474,19 +1407,13 @@ function recalculateMapForFullscreen(scene) {
                     disaster.setPosition(screenX, screenY);
                     
                     const isPortrait = screenHeight > screenWidth;
-                    const portraitReduction = isPortrait ? 0.5 : 1.0;
-                    const disasterScale = 0.06 * Math.max(0.7, scale) * portraitReduction;
+                    const disasterScale = getDisasterScale(disaster.disasterType || 'storm', scale, isPortrait);
                     disaster.setScale(disasterScale);
                     
-                    // Update collision box for disasters
+                    // Update collision body for disasters to centered circle
                     if (disaster.body) {
-                        const bodyW = disaster.displayWidth * 0.8;
-                        const bodyH = disaster.displayHeight * 0.8;
-                        disaster.body.setSize(bodyW, bodyH);
-                        disaster.body.setOffset(
-                            (disaster.displayWidth - bodyW) / 2,
-                            (disaster.displayHeight - bodyH) / 2
-                        );
+                        const r = Math.min(disaster.displayWidth, disaster.displayHeight) * 0.4;
+                        disaster.body.setCircle(r, (disaster.displayWidth - r * 2) / 2, (disaster.displayHeight - r * 2) / 2);
                         if (typeof disaster.body.updateFromGameObject === 'function') {
                             disaster.body.updateFromGameObject();
                         }
@@ -1505,6 +1432,9 @@ function recalculateMapForFullscreen(scene) {
                             }
                         }
                     }
+
+                    // Keep overlay in sync
+                    updateCollisionOverlay(disaster);
                 }
             });
         }
@@ -1522,19 +1452,17 @@ function recalculateMapForFullscreen(scene) {
                     const powerUpScale = 0.08 * Math.max(0.7, scale) * portraitReduction;
                     powerUp.setScale(powerUpScale);
                     
-                    // Update collision box for power-ups
+                    // Update collision body for power-ups to centered circle
                     if (powerUp.body) {
-                        const bodyW = powerUp.displayWidth;
-                        const bodyH = powerUp.displayHeight;
-                        powerUp.body.setSize(bodyW, bodyH);
-                        powerUp.body.setOffset(
-                            (powerUp.displayWidth - bodyW) / 2,
-                            (powerUp.displayHeight - bodyH) / 2
-                        );
+                        const r = Math.min(powerUp.displayWidth, powerUp.displayHeight) * 0.5;
+                        powerUp.body.setCircle(r, (powerUp.displayWidth - r * 2) / 2, (powerUp.displayHeight - r * 2) / 2);
                         if (typeof powerUp.body.updateFromGameObject === 'function') {
                             powerUp.body.updateFromGameObject();
                         }
                     }
+
+                    // Keep overlay in sync
+                    updateCollisionOverlay(powerUp);
                 }
             });
         }
@@ -1602,9 +1530,8 @@ function initializeGame() {
             // Recalculate map if game is active
             const gameScene = game.scene.scenes[0];
             if (gameScene.scene.isActive()) {
-                setTimeout(() => {
-                    recalculateMapForFullscreen(gameScene);
-                }, 50);
+                // Recalculate immediately on resize to keep bounds accurate
+                recalculateMapForFullscreen(gameScene);
             }
         }
     });

@@ -184,8 +184,7 @@ class MobileHandler {
     async updateDisasters() {
         return new Promise((resolve) => {
             if (!window.disasters || !window.disasters.children || !this.gameScene) return resolve();
-            const isPortrait = window.innerHeight > window.innerWidth;
-            const portraitReduction = isPortrait ? 0.7 : 1.0;
+        const isPortrait = window.innerHeight > window.innerWidth;
             window.disasters.children.entries.forEach((d) => {
                 const mapX = (d.originalMapX !== undefined) ? d.originalMapX : d.originalX;
                 const mapY = (d.originalMapY !== undefined) ? d.originalMapY : d.originalY;
@@ -193,8 +192,9 @@ class MobileHandler {
                     const x = this.gameScene.mapOffsetX + (mapX * this.gameScene.mapScale);
                     const y = this.gameScene.mapOffsetY + (mapY * this.gameScene.mapScale);
                     d.setPosition(x, y);
-                    const s = 0.06 * Math.max(0.7, this.gameScene.mapScale) * portraitReduction;
-                    d.setScale(s);
+            const type = d.disasterType || 'storm';
+            const s = (window.getDisasterScale) ? window.getDisasterScale(type, this.gameScene.mapScale, isPortrait) : 0.15 * Math.max(0.6, this.gameScene.mapScale) * (isPortrait ? 0.7 : 1.0);
+            d.setScale(s);
                     if (d.body) {
                         const w = d.displayWidth * 0.8;
                         const h = d.displayHeight * 0.8;
