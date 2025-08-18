@@ -251,6 +251,7 @@ function create() {
     this.mapOffsetY = offsetY;
     this.mapWidth = mapSprite.displayWidth;
     this.mapHeight = mapSprite.displayHeight;
+    this.previousMapScale = scale;
     
     // Update coordinate manager with current transform if available
     if (coordinateManager && typeof coordinateManager.updateTransform === 'function') {
@@ -379,7 +380,9 @@ function create() {
                 const targetY = pointer.y;
                 
                 // Move player towards touch/click position
-                this.physics.moveToObject(player, { x: targetX, y: targetY }, 200);
+                const currentScale = this.mapScale || 1;
+                const moveSpeed = 200 * currentScale;
+                this.physics.moveToObject(player, { x: targetX, y: targetY }, moveSpeed);
             }
         }
     });
@@ -477,19 +480,23 @@ function update() {
         }
     }
 
-    // Keyboard and mobile controls
+    // Keyboard and mobile controls (scale movement speed with map scale to keep map-relative speed constant)
+    const scale = this.mapScale || 1;
+    const basePlayerSpeed = 200;
+    const scaledSpeed = basePlayerSpeed * scale;
+
     if (cursors.left.isDown || mobileControls.left) {
-        player.setVelocityX(-200);
+        player.setVelocityX(-scaledSpeed);
     } else if (cursors.right.isDown || mobileControls.right) {
-        player.setVelocityX(200);
+        player.setVelocityX(scaledSpeed);
     } else {
         player.setVelocityX(0);
     }
 
     if (cursors.up.isDown || mobileControls.up) {
-        player.setVelocityY(-200);
+        player.setVelocityY(-scaledSpeed);
     } else if (cursors.down.isDown || mobileControls.down) {
-        player.setVelocityY(200);
+        player.setVelocityY(scaledSpeed);
     } else {
         player.setVelocityY(0);
     }
@@ -537,28 +544,29 @@ function spawnDisaster() {
     // Spawn disasters from edges of the map area (not screen edges)
     let mapX, mapY, velocityX = 0, velocityY = 0;
     const speedMultiplier = difficultySettings[difficulty].disasterSpeed;
+    const scaleForSpeed = scene.mapScale || 1;
     
     const side = Phaser.Math.Between(0, 3);
     switch (side) {
         case 0: // Top edge of map
             mapX = Phaser.Math.Between(0, coordinateManager.baseMapWidth);
             mapY = -50 / scene.mapScale; // Convert screen pixels to map coordinates
-            velocityY = Phaser.Math.Between(80, 200) * speedMultiplier;
+            velocityY = Phaser.Math.Between(80, 200) * speedMultiplier * scaleForSpeed;
             break;
         case 1: // Right edge of map
             mapX = coordinateManager.baseMapWidth + (50 / scene.mapScale);
             mapY = Phaser.Math.Between(0, coordinateManager.baseMapHeight);
-            velocityX = Phaser.Math.Between(-200, -80) * speedMultiplier;
+            velocityX = Phaser.Math.Between(-200, -80) * speedMultiplier * scaleForSpeed;
             break;
         case 2: // Bottom edge of map
             mapX = Phaser.Math.Between(0, coordinateManager.baseMapWidth);
             mapY = coordinateManager.baseMapHeight + (50 / scene.mapScale);
-            velocityY = Phaser.Math.Between(-200, -80) * speedMultiplier;
+            velocityY = Phaser.Math.Between(-200, -80) * speedMultiplier * scaleForSpeed;
             break;
         case 3: // Left edge of map
             mapX = -50 / scene.mapScale;
             mapY = Phaser.Math.Between(0, coordinateManager.baseMapHeight);
-            velocityX = Phaser.Math.Between(80, 200) * speedMultiplier;
+            velocityX = Phaser.Math.Between(80, 200) * speedMultiplier * scaleForSpeed;
             break;
     }
 
@@ -1427,6 +1435,20 @@ function recalculateMapForFullscreen(scene) {
                             (disaster.displayWidth - bodyW) / 2,
                             (disaster.displayHeight - bodyH) / 2
                         );
+
+                        // Also scale existing disaster velocity to keep visual speed consistent with scale
+                        const prevScale = scene.previousMapScale || scale;
+                        if (prevScale !== 0) {
+                            const ratio = scale / prevScale;
+                            if (!isFrozen) {
+                                disaster.body.setVelocity(disaster.body.velocity.x * ratio, disaster.body.velocity.y * ratio);
+                            }
+                            // Keep original velocities in sync for correct freeze/unfreeze behavior
+                            if (disaster.originalVelocityX !== undefined && disaster.originalVelocityY !== undefined) {
+                                disaster.originalVelocityX *= ratio;
+                                disaster.originalVelocityY *= ratio;
+                            }
+                        }
                     }
                 }
             });
@@ -1459,7 +1481,10 @@ function recalculateMapForFullscreen(scene) {
             });
         }
         
-        console.log('Map recalculation complete');
+    // Record the last scale to compute ratios on the next change
+    scene.previousMapScale = scale;
+
+    console.log('Map recalculation complete');
         
     } catch (error) {
         console.error('Error recalculating map for fullscreen:', error);

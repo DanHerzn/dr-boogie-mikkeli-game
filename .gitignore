@@ -29,3 +29,11 @@ Thumbs.db
 
 # Environment variables
 .env
+
+# Node/npm
+node_modules/
+package-lock.json
+
+# Playwright artifacts
+playwright-report/
+test-results/

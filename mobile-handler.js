@@ -91,21 +91,31 @@ class MobileHandler {
             if (!this.gameScene) return resolve();
             const screenWidth = window.innerWidth;
             const screenHeight = window.innerHeight;
-            const scaleX = screenWidth / this.originalMapDimensions.width;
-            const scaleY = screenHeight / this.originalMapDimensions.height;
-            let scale = Math.min(scaleX, scaleY);
-            const isLandscape = screenWidth > screenHeight;
-            // Mobile-specific comfort limits
-            scale = isLandscape ? Math.max(0.5, Math.min(scale, 1.0))
-                                : Math.max(0.4, Math.min(scale, 0.8));
+
+            // Prefer CoordinateManager to keep scaling consistent with the rest of the app
+            let scale;
+            if (window.coordinateManager && typeof window.coordinateManager.calculateOptimalScale === 'function') {
+                scale = window.coordinateManager.calculateOptimalScale(screenWidth, screenHeight, true);
+            } else {
+                const scaleX = screenWidth / this.originalMapDimensions.width;
+                const scaleY = screenHeight / this.originalMapDimensions.height;
+                scale = Math.min(scaleX, scaleY);
+            }
+
+            let offsets;
+            if (window.coordinateManager && typeof window.coordinateManager.calculateCenteredOffset === 'function') {
+                offsets = window.coordinateManager.calculateCenteredOffset(scale, screenWidth, screenHeight);
+            } else {
+                const scaledW = this.originalMapDimensions.width * scale;
+                const scaledH = this.originalMapDimensions.height * scale;
+                offsets = { offsetX: (screenWidth - scaledW) / 2, offsetY: (screenHeight - scaledH) / 2 };
+            }
 
             this.gameScene.mapScale = scale;
-            const scaledW = this.originalMapDimensions.width * scale;
-            const scaledH = this.originalMapDimensions.height * scale;
-            this.gameScene.mapOffsetX = (screenWidth - scaledW) / 2;
-            this.gameScene.mapOffsetY = (screenHeight - scaledH) / 2;
-            this.gameScene.mapWidth = scaledW;
-            this.gameScene.mapHeight = scaledH;
+            this.gameScene.mapOffsetX = offsets.offsetX;
+            this.gameScene.mapOffsetY = offsets.offsetY;
+            this.gameScene.mapWidth = this.originalMapDimensions.width * scale;
+            this.gameScene.mapHeight = this.originalMapDimensions.height * scale;
 
             if (this.gameScene.mapSprite) {
                 this.gameScene.mapSprite.setOrigin(0, 0);
