@@ -292,10 +292,10 @@ function create() {
     // Set collision box based on display size (post-scale) and center it
     const bodyPlayerWidth = player.displayWidth * 0.8;
     const bodyPlayerHeight = player.displayHeight * 0.8;
-    player.body.setSize(player.displayWidth * 0.9, player.displayHeight * 0.9);
+    player.body.setSize(player.displayWidth * 0.95, player.displayHeight * 0.95);
     player.body.setOffset(
-        (player.displayWidth - player.displayWidth * 0.9) / 2,
-        (player.displayHeight - player.displayHeight * 0.9) / 2
+        (player.displayWidth - player.displayWidth * 0.95) / 2,
+        (player.displayHeight - player.displayHeight * 0.95) / 2
     );
 
     // Create landmarks as invisible collision areas with dot overlays
@@ -741,6 +741,7 @@ function saveLandmark(player, landmark) {
 }
 
 function blockDisaster(player, disaster) {
+    if (!player || !player.active || !disaster || !disaster.active) return;
     // Player collides with disaster - this counts as "blocking disaster" = +10 points
     score += 10;
     
@@ -1088,6 +1089,7 @@ function spawnShieldPowerUp() {
 }
 
 function collectPowerUp(player, powerUp) {
+    if (!player || !player.active || !powerUp || !powerUp.active) return;
     if (powerUp.powerType === 'freeze') {
         // Activate freeze effect
         isFrozen = true;
@@ -1413,6 +1415,9 @@ function recalculateMapForFullscreen(scene) {
                     (player.displayWidth - bodyW) / 2,
                     (player.displayHeight - bodyH) / 2
                 );
+                if (typeof player.body.updateFromGameObject === 'function') {
+                    player.body.updateFromGameObject();
+                }
             }
 
             // Clamp player inside new map bounds
@@ -1475,6 +1480,9 @@ function recalculateMapForFullscreen(scene) {
                             (disaster.displayWidth - bodyW) / 2,
                             (disaster.displayHeight - bodyH) / 2
                         );
+                        if (typeof disaster.body.updateFromGameObject === 'function') {
+                            disaster.body.updateFromGameObject();
+                        }
 
                         // Also scale existing disaster velocity to keep visual speed consistent with scale
                         const prevScale = scene.previousMapScale || scale;
@@ -1516,6 +1524,9 @@ function recalculateMapForFullscreen(scene) {
                             (powerUp.displayWidth - bodyW) / 2,
                             (powerUp.displayHeight - bodyH) / 2
                         );
+                        if (typeof powerUp.body.updateFromGameObject === 'function') {
+                            powerUp.body.updateFromGameObject();
+                        }
                     }
                 }
             });

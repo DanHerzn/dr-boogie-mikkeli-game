@@ -151,6 +151,9 @@ class MobileHandler {
                 const h = window.player.displayHeight * 0.8;
                 window.player.body.setSize(w, h);
                 window.player.body.setOffset((window.player.displayWidth - w) / 2, (window.player.displayHeight - h) / 2);
+                if (typeof window.player.body.updateFromGameObject === 'function') {
+                    window.player.body.updateFromGameObject();
+                }
             }
             resolve();
         });
@@ -197,6 +200,9 @@ class MobileHandler {
                         const h = d.displayHeight * 0.8;
                         d.body.setSize(w, h);
                         d.body.setOffset((d.displayWidth - w) / 2, (d.displayHeight - h) / 2);
+                        if (typeof d.body.updateFromGameObject === 'function') {
+                            d.body.updateFromGameObject();
+                        }
                     }
                 }
             });
@@ -223,6 +229,9 @@ class MobileHandler {
                         const h = p.displayHeight;
                         p.body.setSize(w, h);
                         p.body.setOffset((p.displayWidth - w) / 2, (p.displayHeight - h) / 2);
+                        if (typeof p.body.updateFromGameObject === 'function') {
+                            p.body.updateFromGameObject();
+                        }
                     }
                 }
             });
